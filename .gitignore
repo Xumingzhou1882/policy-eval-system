@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.tmp
+*.log
+data/auto/
+data/manual/
+data/raw/
+data/merged/
