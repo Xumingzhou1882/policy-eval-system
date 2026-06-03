@@ -123,7 +123,7 @@ def synthetic_control(panel: pd.DataFrame, treated_id, donor_ids: list,
     att = float(np.mean(gaps))
 
     # Inference: in-space placebo (apply SCM to each donor)
-    placebo_gaps = {}
+    placebo_results = {}
     for donor in valid_donors[:20]:  # limit for speed
         try:
             other_donors = [d for d in valid_donors if d != donor]
@@ -154,7 +154,15 @@ def synthetic_control(panel: pd.DataFrame, treated_id, donor_ids: list,
             X_post_d = np.column_stack(X_post_d)
 
             fake_synth_post = X_post_d @ res_d.x
-            placebo_gaps[donor] = (Y_post_actual_d - fake_synth_post).tolist()
+            gaps_d = Y_post_actual_d - fake_synth_post
+
+            # Pre-treatment RMSE for this donor (from its own SCM fit)
+            pre_rmse_d = np.sqrt(res_d.fun / len(Y_pre_d)) if res_d.fun else 0.0
+
+            placebo_results[donor] = {
+                "gaps": gaps_d.tolist(),
+                "pre_rmse": float(pre_rmse_d),
+            }
         except Exception:
             continue
 
@@ -163,10 +171,11 @@ def synthetic_control(panel: pd.DataFrame, treated_id, donor_ids: list,
     ratio = rmse_post / rmse_pre if rmse_pre > 0 else float("inf")
 
     # P-value from in-space placebo
-    pre_post_ratios = [rmse_post / rmse_pre]
-    for donor, gap_list in placebo_gaps.items():
-        pre_rmse_d = rmse_pre  # approx
-        post_rmse_d = np.sqrt(np.mean(np.array(gap_list) ** 2))
+    pre_post_ratios = [rmse_post / rmse_pre] if rmse_pre > 0 else [float("inf")]
+    for donor, info in placebo_results.items():
+        gap_array = np.array(info["gaps"])
+        post_rmse_d = np.sqrt(np.mean(gap_array ** 2))
+        pre_rmse_d = info["pre_rmse"]
         if pre_rmse_d > 0:
             pre_post_ratios.append(post_rmse_d / pre_rmse_d)
     p_value = np.mean(np.array(pre_post_ratios) >= pre_post_ratios[0])
@@ -188,7 +197,7 @@ def synthetic_control(panel: pd.DataFrame, treated_id, donor_ids: list,
             "gap": gaps.tolist(),
         },
         "p_value": float(p_value),
-        "n_placebo": len(placebo_gaps),
+        "n_placebo": len(placebo_results),
     }
 
 

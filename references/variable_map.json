@@ -1,0 +1,1385 @@
+{
+  "_description": "Maps Stage 4 variable requirements to Stage 5 fetch functions. Each entry specifies the data source, function to call, parameters, and column mapping. Generic entries use 'source: akshare' with inline call config. Non-trivial entries use 'source: akshare_city/province' (year-loop) or 'source: world_bank/yfinance'.",
+
+  "gdp": {
+    "description": "GDP (current US$)",
+    "source": "world_bank",
+    "wb_indicator": "NY.GDP.MKTP.CD",
+    "level": "country_year",
+    "countries": ["CN"],
+    "notes": "For China city-level GDP, use 'city_gdp' instead."
+  },
+
+  "gdp_per_capita": {
+    "description": "GDP per capita (current US$)",
+    "source": "world_bank",
+    "wb_indicator": "NY.GDP.PCAP.CD",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "gdp_growth": {
+    "description": "GDP growth rate (annual %)",
+    "source": "world_bank",
+    "wb_indicator": "NY.GDP.MKTP.KD.ZG",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "population": {
+    "description": "Total population",
+    "source": "world_bank",
+    "wb_indicator": "SP.POP.TOTL",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "fertility_rate": {
+    "description": "Fertility rate (births per woman)",
+    "source": "world_bank",
+    "wb_indicator": "SP.DYN.TFRT.IN",
+    "level": "country_year",
+    "countries": ["CN"],
+    "keywords": "生育率 出生率 TFR fertility birth rate"
+  },
+
+  "life_expectancy": {
+    "description": "Life expectancy at birth (years)",
+    "source": "world_bank",
+    "wb_indicator": "SP.DYN.LE00.IN",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "infant_mortality": {
+    "description": "Infant mortality rate (per 1,000 live births)",
+    "source": "world_bank",
+    "wb_indicator": "SP.DYN.IMRT.IN",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "urban_population_pct": {
+    "description": "Urban population (% of total)",
+    "source": "world_bank",
+    "wb_indicator": "SP.URB.TOTL.IN.ZS",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "trade_pct_gdp": {
+    "description": "Trade (% of GDP)",
+    "source": "world_bank",
+    "wb_indicator": "NE.TRD.GNFS.ZS",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "fdi_pct_gdp": {
+    "description": "FDI, net inflows (% of GDP)",
+    "source": "world_bank",
+    "wb_indicator": "BX.KLT.DINV.WD.GD.ZS",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "co2_emissions": {
+    "description": "CO2 emissions (kt)",
+    "source": "world_bank",
+    "wb_indicator": "EN.ATM.CO2E.KT",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "health_expenditure_pct": {
+    "description": "Health expenditure (% of GDP)",
+    "source": "world_bank",
+    "wb_indicator": "SH.XPD.CHEX.GD.ZS",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "unemployment_rate": {
+    "description": "Unemployment, total (% of labor force)",
+    "source": "world_bank",
+    "wb_indicator": "SL.UEM.TOTL.ZS",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "inflation_cpi": {
+    "description": "Inflation, CPI (annual %)",
+    "source": "world_bank",
+    "wb_indicator": "FP.CPI.TOTL.ZG",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "exports_pct_gdp": {
+    "description": "Exports (% of GDP)",
+    "source": "world_bank",
+    "wb_indicator": "NE.EXP.GNFS.ZS",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "gini_index": {
+    "description": "Gini index",
+    "source": "world_bank",
+    "wb_indicator": "SI.POV.GINI",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "school_enrollment_secondary": {
+    "description": "School enrollment, secondary (% gross)",
+    "source": "world_bank",
+    "wb_indicator": "SE.SEC.ENRR",
+    "level": "country_year",
+    "countries": ["CN"]
+  },
+
+  "city_gdp": {
+    "description": "China city-level GDP",
+    "source": "akshare_city",
+    "akshare_indicator": "gdp",
+    "level": "city_year"
+  },
+
+  "city_population": {
+    "description": "China city-level year-end population",
+    "source": "akshare_city",
+    "akshare_indicator": "population",
+    "level": "city_year"
+  },
+
+  "city_fiscal_revenue": {
+    "description": "China city-level fiscal revenue",
+    "source": "akshare_city",
+    "akshare_indicator": "fiscal_revenue",
+    "level": "city_year"
+  },
+
+  "city_fiscal_expenditure": {
+    "description": "China city-level fiscal expenditure",
+    "source": "akshare_city",
+    "akshare_indicator": "fiscal_expenditure",
+    "level": "city_year"
+  },
+
+  "city_retail_sales": {
+    "description": "China city-level retail sales",
+    "source": "akshare_city",
+    "akshare_indicator": "retail_sales",
+    "level": "city_year"
+  },
+
+  "city_industrial_output": {
+    "description": "China city-level industrial output",
+    "source": "akshare_city",
+    "akshare_indicator": "industrial_output",
+    "level": "city_year"
+  },
+
+  "city_fixed_investment": {
+    "description": "China city-level fixed asset investment",
+    "source": "akshare_city",
+    "akshare_indicator": "fixed_investment",
+    "level": "city_year"
+  },
+
+  "city_savings": {
+    "description": "China city-level household savings",
+    "source": "akshare_city",
+    "akshare_indicator": "savings",
+    "level": "city_year"
+  },
+
+  "city_foreign_trade": {
+    "description": "China city-level foreign trade volume",
+    "source": "akshare_city",
+    "akshare_indicator": "foreign_trade",
+    "level": "city_year"
+  },
+
+  "city_education_expenditure": {
+    "description": "China city-level education expenditure",
+    "source": "akshare_city",
+    "akshare_indicator": "education_expenditure",
+    "level": "city_year"
+  },
+
+  "city_urban_disposable_income": {
+    "description": "China city-level urban disposable income per capita",
+    "source": "akshare_city",
+    "akshare_indicator": "urban_disposable_income",
+    "level": "city_year",
+    "keywords": "城镇居民人均可支配收入 居民收入 城市收入 income per capita urban resident"
+  },
+
+  "city_rural_disposable_income": {
+    "description": "China city-level rural disposable income per capita",
+    "source": "akshare_city",
+    "akshare_indicator": "rural_disposable_income",
+    "level": "city_year",
+    "keywords": "农村居民人均可支配收入 农民收入 rural income"
+  },
+
+  "city_avg_wage": {
+    "description": "China city-level average wage",
+    "source": "akshare_city",
+    "akshare_indicator": "avg_wage",
+    "level": "city_year",
+    "keywords": "平均工资 职工工资 工资水平 wage salary"
+  },
+
+  "city_unemployment_registered": {
+    "description": "China city-level registered unemployed persons",
+    "source": "akshare_city",
+    "akshare_indicator": "unemployment_registered",
+    "level": "city_year",
+    "keywords": "城镇登记失业人数 失业 unemployment"
+  },
+
+  "city_employment": {
+    "description": "China city-level employment",
+    "source": "akshare_city",
+    "akshare_indicator": "employment",
+    "level": "city_year",
+    "keywords": "从业人员 就业人数 employment worker"
+  },
+
+  "city_hospital_beds": {
+    "description": "China city-level hospital beds",
+    "source": "akshare_city",
+    "akshare_indicator": "hospital_beds",
+    "level": "city_year",
+    "keywords": "医院床位 卫生院床位 床位数 hospital beds healthcare"
+  },
+
+  "city_health_institutions": {
+    "description": "China city-level number of health institutions",
+    "source": "akshare_city",
+    "akshare_indicator": "health_institutions",
+    "level": "city_year",
+    "keywords": "卫生机构数 医疗机构 医院数 health institutions hospital"
+  },
+
+  "city_doctors": {
+    "description": "China city-level practicing doctors",
+    "source": "akshare_city",
+    "akshare_indicator": "doctors",
+    "level": "city_year",
+    "keywords": "执业医师 医生数 doctor physician medical"
+  },
+
+  "city_secondary_students": {
+    "description": "China city-level secondary school students",
+    "source": "akshare_city",
+    "akshare_indicator": "secondary_students",
+    "level": "city_year",
+    "keywords": "中学生 在校学生 普通中学 student school education"
+  },
+
+  "city_college_students": {
+    "description": "China city-level college students",
+    "source": "akshare_city",
+    "akshare_indicator": "college_students",
+    "level": "city_year",
+    "keywords": "大学生 高等学校 在校学生 college university student education"
+  },
+
+  "city_road_area": {
+    "description": "China city-level road area",
+    "source": "akshare_city",
+    "akshare_indicator": "road_area",
+    "level": "city_year",
+    "keywords": "道路面积 城市道路 基础设施 road infrastructure"
+  },
+
+  "city_built_up_area": {
+    "description": "China city-level built-up area (建成区面积)",
+    "source": "akshare_city",
+    "akshare_indicator": "built_up_area",
+    "level": "city_year",
+    "keywords": "建成区面积 城市建设用地 built area urban"
+  },
+
+  "city_green_area": {
+    "description": "China city-level green area",
+    "source": "akshare_city",
+    "akshare_indicator": "green_area",
+    "level": "city_year",
+    "keywords": "绿地面积 绿化 green space environment"
+  },
+
+  "city_park_green_area": {
+    "description": "China city-level park green area",
+    "source": "akshare_city",
+    "akshare_indicator": "park_green_area",
+    "level": "city_year",
+    "keywords": "公园绿地 公园面积 park green recreation"
+  },
+
+  "city_water_supply": {
+    "description": "China city-level water supply",
+    "source": "akshare_city",
+    "akshare_indicator": "water_supply",
+    "level": "city_year",
+    "keywords": "供水总量 自来水 用水 water utility"
+  },
+
+  "city_electricity_consumption": {
+    "description": "China city-level electricity consumption",
+    "source": "akshare_city",
+    "akshare_indicator": "electricity_consumption",
+    "level": "city_year",
+    "keywords": "用电量 电力消费 electricity power energy"
+  },
+
+  "city_gas_supply": {
+    "description": "China city-level gas supply",
+    "source": "akshare_city",
+    "akshare_indicator": "gas_supply",
+    "level": "city_year",
+    "keywords": "供气总量 天然气 燃气 gas energy utility"
+  },
+
+  "city_patents": {
+    "description": "China city-level number of patent grants",
+    "source": "akshare_city",
+    "akshare_indicator": "patents",
+    "level": "city_year",
+    "keywords": "专利授权 发明专利 创新 patent innovation"
+  },
+
+  "city_fdi_actual": {
+    "description": "China city-level actual FDI utilization",
+    "source": "akshare_city",
+    "akshare_indicator": "fdi_actual",
+    "level": "city_year",
+    "keywords": "实际利用外资 外商投资 FDI foreign investment"
+  },
+
+  "city_real_estate_investment": {
+    "description": "China city-level real estate investment",
+    "source": "akshare_city",
+    "akshare_indicator": "real_estate_investment",
+    "level": "city_year",
+    "keywords": "房地产投资 房地产开发 real estate housing investment"
+  },
+
+  "city_car_ownership": {
+    "description": "China city-level car ownership",
+    "source": "akshare_city",
+    "akshare_indicator": "car_ownership",
+    "level": "city_year",
+    "keywords": "汽车拥有量 民用汽车 私家车 car vehicle automobile"
+  },
+
+  "city_mobile_phone_users": {
+    "description": "China city-level mobile phone users",
+    "source": "akshare_city",
+    "akshare_indicator": "mobile_phone_users",
+    "level": "city_year",
+    "keywords": "移动电话 手机用户 通信 mobile phone telecom"
+  },
+
+  "city_internet_users": {
+    "description": "China city-level internet users",
+    "source": "akshare_city",
+    "akshare_indicator": "internet_users",
+    "level": "city_year",
+    "keywords": "互联网用户 宽带 网络 internet broadband"
+  },
+
+  "city_pension_insurance": {
+    "description": "China city-level basic pension insurance participants",
+    "source": "akshare_city",
+    "akshare_indicator": "pension_insurance",
+    "level": "city_year",
+    "keywords": "养老保险 基本养老保险 社保 参保人数 pension social security"
+  },
+
+  "city_medical_insurance": {
+    "description": "China city-level basic medical insurance participants",
+    "source": "akshare_city",
+    "akshare_indicator": "medical_insurance",
+    "level": "city_year",
+    "keywords": "医疗保险 基本医保 参保人数 医保 medical insurance healthcare"
+  },
+
+  "city_unemployment_insurance": {
+    "description": "China city-level unemployment insurance participants",
+    "source": "akshare_city",
+    "akshare_indicator": "unemployment_insurance",
+    "level": "city_year",
+    "keywords": "失业保险 参保人数 失业 unemployment insurance"
+  },
+
+  "city_sewage_treatment_rate": {
+    "description": "China city-level sewage treatment rate",
+    "source": "akshare_city",
+    "akshare_indicator": "sewage_treatment_rate",
+    "level": "city_year",
+    "keywords": "污水处理率 污水 环境 sewage wastewater treatment environment"
+  },
+
+  "city_rd_expenditure": {
+    "description": "China city-level science & technology expenditure (R&D proxy)",
+    "source": "akshare_city",
+    "akshare_indicator": "rd_expenditure",
+    "level": "city_year",
+    "keywords": "研发支出 科技支出 科研 R&D research development science technology"
+  },
+
+  "city_public_transport_vehicles": {
+    "description": "China city-level public transport vehicles",
+    "source": "akshare_city",
+    "akshare_indicator": "public_transport_vehicles",
+    "level": "city_year",
+    "keywords": "公共交通 公交车辆 公共汽车 public transport bus transit"
+  },
+
+  "province_gdp": {
+    "description": "China province-level GDP",
+    "source": "akshare_province",
+    "akshare_indicator": "gdp",
+    "level": "province_year"
+  },
+
+  "province_population": {
+    "description": "China province-level population",
+    "source": "akshare_province",
+    "akshare_indicator": "population",
+    "level": "province_year"
+  },
+
+  "province_gdp_per_capita": {
+    "description": "China province-level GDP per capita",
+    "source": "akshare_province",
+    "akshare_indicator": "gdp_per_capita",
+    "level": "province_year"
+  },
+
+  "province_cpi": {
+    "description": "China province-level CPI",
+    "source": "akshare_province",
+    "akshare_indicator": "cpi",
+    "level": "province_year",
+    "keywords": "居民消费价格指数 物价 CPI inflation"
+  },
+
+  "province_gdp_growth": {
+    "description": "China province-level GDP growth rate",
+    "source": "akshare_province",
+    "akshare_indicator": "gdp_growth",
+    "level": "province_year",
+    "keywords": "GDP增速 经济增长率"
+  },
+
+  "province_primary_industry": {
+    "description": "China province-level primary industry value-added",
+    "source": "akshare_province",
+    "akshare_indicator": "primary_industry",
+    "level": "province_year",
+    "keywords": "第一产业 农业增加值"
+  },
+
+  "province_secondary_industry": {
+    "description": "China province-level secondary industry value-added",
+    "source": "akshare_province",
+    "akshare_indicator": "secondary_industry",
+    "level": "province_year",
+    "keywords": "第二产业 工业增加值 制造业"
+  },
+
+  "province_tertiary_industry": {
+    "description": "China province-level tertiary industry value-added",
+    "source": "akshare_province",
+    "akshare_indicator": "tertiary_industry",
+    "level": "province_year",
+    "keywords": "第三产业 服务业增加值"
+  },
+
+  "province_urbanization_rate": {
+    "description": "China province-level urbanization rate",
+    "source": "akshare_province",
+    "akshare_indicator": "urbanization_rate",
+    "level": "province_year",
+    "keywords": "城镇化率 城市化率 urbanization"
+  },
+
+  "province_birth_rate": {
+    "description": "China province-level birth rate",
+    "source": "akshare_province",
+    "akshare_indicator": "birth_rate",
+    "level": "province_year",
+    "keywords": "出生率 生育 birth fertility"
+  },
+
+  "province_death_rate": {
+    "description": "China province-level death rate",
+    "source": "akshare_province",
+    "akshare_indicator": "death_rate",
+    "level": "province_year",
+    "keywords": "死亡率 mortality death"
+  },
+
+  "province_natural_growth_rate": {
+    "description": "China province-level natural population growth rate",
+    "source": "akshare_province",
+    "akshare_indicator": "natural_growth_rate",
+    "level": "province_year",
+    "keywords": "自然增长率 人口增长 population growth"
+  },
+
+  "province_employment": {
+    "description": "China province-level employment",
+    "source": "akshare_province",
+    "akshare_indicator": "employment",
+    "level": "province_year",
+    "keywords": "就业人数 从业人员 employment"
+  },
+
+  "province_avg_wage": {
+    "description": "China province-level average wage",
+    "source": "akshare_province",
+    "akshare_indicator": "avg_wage",
+    "level": "province_year",
+    "keywords": "平均工资 职工工资 wage salary"
+  },
+
+  "province_urban_disposable_income": {
+    "description": "China province-level urban disposable income per capita",
+    "source": "akshare_province",
+    "akshare_indicator": "urban_disposable_income",
+    "level": "province_year",
+    "keywords": "城镇居民可支配收入 收入 income"
+  },
+
+  "province_rural_disposable_income": {
+    "description": "China province-level rural disposable income per capita",
+    "source": "akshare_province",
+    "akshare_indicator": "rural_disposable_income",
+    "level": "province_year",
+    "keywords": "农村居民可支配收入 农民收入 rural income"
+  },
+
+  "province_urban_consumption": {
+    "description": "China province-level urban consumption expenditure per capita",
+    "source": "akshare_province",
+    "akshare_indicator": "urban_consumption",
+    "level": "province_year",
+    "keywords": "城镇居民消费支出 消费 consumption"
+  },
+
+  "province_rural_consumption": {
+    "description": "China province-level rural consumption expenditure per capita",
+    "source": "akshare_province",
+    "akshare_indicator": "rural_consumption",
+    "level": "province_year",
+    "keywords": "农村居民消费支出 消费 rural consumption"
+  },
+
+  "province_fiscal_revenue": {
+    "description": "China province-level fiscal revenue",
+    "source": "akshare_province",
+    "akshare_indicator": "fiscal_revenue",
+    "level": "province_year",
+    "keywords": "财政收入 一般公共预算收入 fiscal revenue"
+  },
+
+  "province_fiscal_expenditure": {
+    "description": "China province-level fiscal expenditure",
+    "source": "akshare_province",
+    "akshare_indicator": "fiscal_expenditure",
+    "level": "province_year",
+    "keywords": "财政支出 一般公共预算支出 fiscal expenditure"
+  },
+
+  "province_retail_sales": {
+    "description": "China province-level retail sales",
+    "source": "akshare_province",
+    "akshare_indicator": "retail_sales",
+    "level": "province_year",
+    "keywords": "社会消费品零售总额 消费 retail sales consumption"
+  },
+
+  "province_fixed_investment": {
+    "description": "China province-level fixed asset investment",
+    "source": "akshare_province",
+    "akshare_indicator": "fixed_investment",
+    "level": "province_year",
+    "keywords": "固定资产投资 投资 fixed investment"
+  },
+
+  "province_real_estate_investment": {
+    "description": "China province-level real estate investment",
+    "source": "akshare_province",
+    "akshare_indicator": "real_estate_investment",
+    "level": "province_year",
+    "keywords": "房地产投资 房地产开发 real estate housing"
+  },
+
+  "province_foreign_trade": {
+    "description": "China province-level foreign trade volume",
+    "source": "akshare_province",
+    "akshare_indicator": "foreign_trade",
+    "level": "province_year",
+    "keywords": "进出口总额 贸易 foreign trade"
+  },
+
+  "province_exports": {
+    "description": "China province-level exports",
+    "source": "akshare_province",
+    "akshare_indicator": "exports",
+    "level": "province_year",
+    "keywords": "出口总额 export"
+  },
+
+  "province_imports": {
+    "description": "China province-level imports",
+    "source": "akshare_province",
+    "akshare_indicator": "imports",
+    "level": "province_year",
+    "keywords": "进口总额 import"
+  },
+
+  "province_fdi_actual": {
+    "description": "China province-level actual FDI utilization",
+    "source": "akshare_province",
+    "akshare_indicator": "fdi_actual",
+    "level": "province_year",
+    "keywords": "实际利用外资 外商投资 FDI"
+  },
+
+  "province_hospital_beds": {
+    "description": "China province-level hospital beds",
+    "source": "akshare_province",
+    "akshare_indicator": "hospital_beds",
+    "level": "province_year",
+    "keywords": "医院床位 医疗床位 healthcare beds"
+  },
+
+  "province_doctors": {
+    "description": "China province-level practicing doctors",
+    "source": "akshare_province",
+    "akshare_indicator": "doctors",
+    "level": "province_year",
+    "keywords": "执业医师 医生 doctor physician"
+  },
+
+  "province_college_students": {
+    "description": "China province-level college students",
+    "source": "akshare_province",
+    "akshare_indicator": "college_students",
+    "level": "province_year",
+    "keywords": "大学生 高等学校 在校生 college university education"
+  },
+
+  "province_patents": {
+    "description": "China province-level patent grants",
+    "source": "akshare_province",
+    "akshare_indicator": "patents",
+    "level": "province_year",
+    "keywords": "专利授权 发明专利 patent innovation"
+  },
+
+  "city_birth_rate": {
+    "description": "China city-level birth rate",
+    "source": "akshare_city",
+    "akshare_indicator": "birth_rate",
+    "level": "city_year",
+    "keywords": "出生率 生育 birth fertility rate"
+  },
+
+  "city_death_rate": {
+    "description": "China city-level death rate",
+    "source": "akshare_city",
+    "akshare_indicator": "death_rate",
+    "level": "city_year",
+    "keywords": "死亡率 mortality death rate"
+  },
+
+  "city_natural_growth_rate": {
+    "description": "China city-level natural population growth rate",
+    "source": "akshare_city",
+    "akshare_indicator": "natural_growth_rate",
+    "level": "city_year",
+    "keywords": "自然增长率 人口自然增长 population growth"
+  },
+
+  "shanghai_index": {
+    "description": "上证综指 daily OHLCV",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "stock_zh_index_daily",
+      "kwargs": {"symbol": "sh000001"},
+      "rename": {"日期": "date", "开盘": "open", "最高": "high", "最低": "low", "收盘": "close", "成交量": "volume"},
+      "entity_id": "shanghai_composite",
+      "output_cols": ["entity_id", "date", "open", "high", "low", "close", "volume"]
+    }
+  },
+
+  "shenzhen_index": {
+    "description": "深证成指 daily OHLCV",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "stock_zh_index_daily",
+      "kwargs": {"symbol": "sz399001"},
+      "rename": {"日期": "date", "开盘": "open", "最高": "high", "最低": "low", "收盘": "close", "成交量": "volume"},
+      "entity_id": "shenzhen_component",
+      "output_cols": ["entity_id", "date", "open", "high", "low", "close", "volume"]
+    }
+  },
+
+  "csi300": {
+    "description": "沪深300 daily OHLCV",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "stock_zh_index_daily",
+      "kwargs": {"symbol": "sh000300"},
+      "rename": {"日期": "date", "开盘": "open", "最高": "high", "最低": "low", "收盘": "close", "成交量": "volume"},
+      "entity_id": "csi300",
+      "output_cols": ["entity_id", "date", "open", "high", "low", "close", "volume"]
+    }
+  },
+
+  "csi500": {
+    "description": "中证500 daily OHLCV",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "stock_zh_index_daily",
+      "kwargs": {"symbol": "sh000905"},
+      "rename": {"日期": "date", "开盘": "open", "最高": "high", "最低": "low", "收盘": "close", "成交量": "volume"},
+      "entity_id": "csi500",
+      "output_cols": ["entity_id", "date", "open", "high", "low", "close", "volume"]
+    }
+  },
+
+  "csi1000": {
+    "description": "中证1000 daily OHLCV",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "stock_zh_index_daily",
+      "kwargs": {"symbol": "sh000852"},
+      "rename": {"日期": "date", "开盘": "open", "最高": "high", "最低": "low", "收盘": "close", "成交量": "volume"},
+      "entity_id": "csi1000",
+      "output_cols": ["entity_id", "date", "open", "high", "low", "close", "volume"]
+    }
+  },
+
+  "chinext_index": {
+    "description": "创业板指 daily OHLCV",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "stock_zh_index_daily",
+      "kwargs": {"symbol": "sz399006"},
+      "rename": {"日期": "date", "开盘": "open", "最高": "high", "最低": "low", "收盘": "close", "成交量": "volume"},
+      "entity_id": "chinext",
+      "output_cols": ["entity_id", "date", "open", "high", "low", "close", "volume"]
+    }
+  },
+
+  "star50_index": {
+    "description": "科创50 daily OHLCV",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "stock_zh_index_daily",
+      "kwargs": {"symbol": "sh000688"},
+      "rename": {"日期": "date", "开盘": "open", "最高": "high", "最低": "low", "收盘": "close", "成交量": "volume"},
+      "entity_id": "star50",
+      "output_cols": ["entity_id", "date", "open", "high", "low", "close", "volume"]
+    }
+  },
+
+  "sse50_index": {
+    "description": "上证50 daily OHLCV",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "stock_zh_index_daily",
+      "kwargs": {"symbol": "sh000016"},
+      "rename": {"日期": "date", "开盘": "open", "最高": "high", "最低": "low", "收盘": "close", "成交量": "volume"},
+      "entity_id": "sse50",
+      "output_cols": ["entity_id", "date", "open", "high", "low", "close", "volume"]
+    }
+  },
+
+  "a_stock_daily": {
+    "description": "A-share individual stock daily OHLCV (use --indicator to specify code)",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "stock_zh_a_hist",
+      "kwargs": {"symbol": "000001", "period": "daily", "adjust": "qfq"},
+      "rename": {"日期": "date", "开盘": "open", "最高": "high", "最低": "low", "收盘": "close", "成交量": "volume"},
+      "entity_id_from_kwarg": "symbol",
+      "output_cols": ["entity_id", "date", "open", "high", "low", "close", "volume"]
+    }
+  },
+
+  "bond_yield_curve": {
+    "description": "中国国债收益率曲线 (3M/6M/1Y/3Y/5Y/10Y/30Y)",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "bond_china_yield",
+      "kwargs": {},
+      "transform": "wide_to_long",
+      "transform_kwargs": {
+        "value_cols": ["3月", "6月", "1年", "3年", "5年", "10年", "30年"],
+        "entity_labels": ["bond_3M", "bond_6M", "bond_1Y", "bond_3Y", "bond_5Y", "bond_10Y", "bond_30Y"],
+        "date_col": "日期"
+      }
+    }
+  },
+
+  "cny_usd": {
+    "description": "人民币兑美元中间价",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "currency_boc_sina",
+      "kwargs": {"symbol": "美元"},
+      "transform": "exchange_rate",
+      "transform_kwargs": {
+        "value_col_candidates": ["中间价", "中行折算价", "收盘"],
+        "entity_id": "cny_usd"
+      }
+    }
+  },
+
+  "cny_eur": {
+    "description": "人民币兑欧元中间价",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "currency_boc_sina",
+      "kwargs": {"symbol": "欧元"},
+      "transform": "exchange_rate",
+      "transform_kwargs": {
+        "value_col_candidates": ["中间价", "中行折算价", "收盘"],
+        "entity_id": "cny_eur"
+      }
+    }
+  },
+
+  "cny_jpy": {
+    "description": "人民币兑日元中间价",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "currency_boc_sina",
+      "kwargs": {"symbol": "日元"},
+      "transform": "exchange_rate",
+      "transform_kwargs": {
+        "value_col_candidates": ["中间价", "中行折算价", "收盘"],
+        "entity_id": "cny_jpy"
+      }
+    }
+  },
+
+  "pmi": {
+    "description": "中国制造业 + 非制造业 PMI (月度)",
+    "source": "akshare",
+    "level": "monthly",
+    "akshare": {
+      "func": "macro_china_pmi",
+      "kwargs": {},
+      "transform": "pmi",
+      "transform_kwargs": {
+        "date_col_candidates": ["日期", "date"],
+        "col_map": {"制造业PMI": "pmi_manufacturing", "非制造业PMI": "pmi_non_manufacturing"}
+      }
+    }
+  },
+
+  "money_supply": {
+    "description": "中国货币供应量 M0/M1/M2 (月度)",
+    "source": "akshare",
+    "level": "monthly",
+    "akshare": {
+      "func": "macro_china_money_supply",
+      "kwargs": {},
+      "transform": "wide_to_long",
+      "transform_kwargs": {
+        "value_cols": ["M0", "M1", "M2"],
+        "entity_labels": ["m0", "m1", "m2"],
+        "date_col": "月份"
+      }
+    }
+  },
+
+  "shibor": {
+    "description": "Shibor 银行间拆借利率 (日频)",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "macro_china_shibor_all",
+      "kwargs": {},
+      "transform": "wide_to_long",
+      "transform_kwargs": {
+        "value_cols": ["O/N", "1W", "2W", "1M", "3M", "6M", "9M", "1Y"],
+        "entity_labels": ["shibor_on", "shibor_1w", "shibor_2w", "shibor_1m", "shibor_3m", "shibor_6m", "shibor_9m", "shibor_1y"],
+        "date_col": "日期"
+      }
+    }
+  },
+
+  "lpr": {
+    "description": "LPR 贷款市场报价利率 1Y/5Y (月度)",
+    "source": "akshare",
+    "level": "monthly",
+    "akshare": {
+      "func": "macro_china_lpr",
+      "kwargs": {},
+      "transform": "wide_to_long",
+      "transform_kwargs": {
+        "value_cols": ["1Y", "5Y"],
+        "entity_labels": ["lpr_1y", "lpr_5y"],
+        "date_col": "日期"
+      }
+    }
+  },
+
+  "aqi_city": {
+    "description": "城市日频 AQI / PM2.5 / PM10 / SO2 / NO2 / CO / O3",
+    "source": "akshare_custom",
+    "akshare_custom": "aqi",
+    "level": "daily",
+    "notes": "按城市循环获取。单个城市：akshare_indicator=城市名。批量：用 city_list 参数。",
+    "akshare_indicator": "beijing"
+  },
+
+  "social_financing": {
+    "description": "中国社会融资规模增量 (月度)",
+    "source": "akshare",
+    "level": "monthly",
+    "akshare": {
+      "func": "macro_china_shrzgm",
+      "kwargs": {},
+      "rename": {"月份": "date", "社会融资规模增量": "value"},
+      "entity_id": "social_financing",
+      "output_cols": ["entity_id", "date", "value"]
+    },
+    "keywords": "社会融资 社融 aggregate financing credit"
+  },
+
+  "forex_reserves": {
+    "description": "中国外汇储备 (月度, 亿美元)",
+    "source": "akshare",
+    "level": "monthly",
+    "akshare": {
+      "func": "macro_china_fx_gold",
+      "kwargs": {},
+      "rename": {"月份": "date", "外汇储备": "forex", "黄金储备": "gold"},
+      "entity_id": "china_forex",
+      "output_cols": ["entity_id", "date", "forex", "gold"]
+    },
+    "keywords": "外汇储备 黄金储备 央行 forex reserves gold"
+  },
+
+  "industrial_profit": {
+    "description": "中国工业企业利润累计值 (月度, 亿元)",
+    "source": "akshare",
+    "level": "monthly",
+    "akshare": {
+      "func": "macro_china_industrial_profit",
+      "kwargs": {},
+      "rename": {"日期": "date", "累计值": "value"},
+      "entity_id": "industrial_profit",
+      "output_cols": ["entity_id", "date", "value"]
+    },
+    "keywords": "工业企业利润 工业利润 industrial profit"
+  },
+
+  "consumer_confidence": {
+    "description": "中国消费者信心指数 (月度)",
+    "source": "akshare",
+    "level": "monthly",
+    "akshare": {
+      "func": "macro_china_consumer_confidence",
+      "kwargs": {},
+      "rename": {"日期": "date", "消费者信心指数": "confidence", "消费者满意指数": "satisfaction", "消费者预期指数": "expectation"},
+      "entity_id": "china_consumer",
+      "output_cols": ["entity_id", "date", "confidence", "satisfaction", "expectation"]
+    },
+    "keywords": "消费者信心 消费信心 consumer confidence sentiment"
+  },
+
+  "real_estate_new_starts": {
+    "description": "中国房地产新开工面积 (月度累计)",
+    "source": "akshare",
+    "level": "monthly",
+    "akshare": {
+      "func": "macro_china_real_estate",
+      "kwargs": {},
+      "rename": {"日期": "date", "新开工面积": "new_starts", "竣工面积": "completions", "销售面积": "sales_area"},
+      "entity_id": "china_real_estate",
+      "output_cols": ["entity_id", "date", "new_starts", "completions", "sales_area"]
+    },
+    "keywords": "房地产 新开工 竣工 销售 real estate housing starts"
+  },
+
+  "power_generation": {
+    "description": "中国发电量 (月度, 亿千瓦时)",
+    "source": "akshare",
+    "level": "monthly",
+    "akshare": {
+      "func": "macro_china_power_generation",
+      "kwargs": {},
+      "rename": {"日期": "date", "全国发电量": "total", "火电": "thermal", "水电": "hydro", "风电": "wind", "太阳能": "solar"},
+      "entity_id": "china_power",
+      "output_cols": ["entity_id", "date", "total", "thermal", "hydro", "wind", "solar"]
+    },
+    "keywords": "发电量 电力 火电 水电 风电 太阳能 electricity power generation"
+  },
+
+  "freight_volume": {
+    "description": "中国货运量 (月度, 亿吨)",
+    "source": "akshare",
+    "level": "monthly",
+    "akshare": {
+      "func": "macro_china_freight_volume",
+      "kwargs": {},
+      "rename": {"日期": "date", "货运量": "freight", "铁路货运量": "railway", "公路货运量": "road"},
+      "entity_id": "china_freight",
+      "output_cols": ["entity_id", "date", "freight", "railway", "road"]
+    },
+    "keywords": "货运量 铁路货运 物流 freight logistics railway"
+  },
+
+  "national_fiscal_revenue": {
+    "description": "中国全国财政收入累计值 (月度, 亿元)",
+    "source": "akshare",
+    "level": "monthly",
+    "akshare": {
+      "func": "macro_china_national_fiscal_revenue",
+      "kwargs": {},
+      "rename": {"日期": "date", "全国财政收入": "revenue", "全国财政支出": "expenditure"},
+      "entity_id": "china_fiscal",
+      "output_cols": ["entity_id", "date", "revenue", "expenditure"]
+    },
+    "keywords": "全国财政收入 财政支出 公共财政 national fiscal revenue expenditure"
+  },
+
+  "enterprise_prosperity": {
+    "description": "中国企业景气指数 (季度)",
+    "source": "akshare",
+    "level": "quarterly",
+    "akshare": {
+      "func": "macro_china_enterprise_prosperity",
+      "kwargs": {},
+      "rename": {"日期": "date", "企业景气指数": "prosperity", "企业家信心指数": "confidence"},
+      "entity_id": "china_enterprise",
+      "output_cols": ["entity_id", "date", "prosperity", "confidence"]
+    },
+    "keywords": "企业景气 景气指数 企业家信心 business climate prosperity"
+  },
+
+  "new_credit_loans": {
+    "description": "中国新增信贷数据 (月度, 亿元)",
+    "source": "akshare",
+    "level": "monthly",
+    "akshare": {
+      "func": "macro_china_new_credit_loans",
+      "kwargs": {},
+      "rename": {"日期": "date", "新增贷款": "new_loans", "新增居民短期贷款": "household_short", "新增居民中长期贷款": "household_long", "新增企业贷款": "enterprise_loans"},
+      "entity_id": "china_credit",
+      "output_cols": ["entity_id", "date", "new_loans", "household_short", "household_long", "enterprise_loans"]
+    },
+    "keywords": "新增贷款 信贷 居民贷款 企业贷款 credit loans"
+  },
+
+  "house_price_70cities": {
+    "description": "70大中城市新建/二手住宅价格指数 (月度)",
+    "source": "akshare",
+    "level": "monthly",
+    "akshare": {
+      "func": "macro_china_new_house_price",
+      "kwargs": {},
+      "transform": "wide_to_long",
+      "transform_kwargs": {
+        "value_cols": ["新建商品住宅价格指数", "二手住宅价格指数"],
+        "entity_labels": ["house_price_new", "house_price_secondhand"],
+        "date_col": "日期"
+      }
+    }
+  },
+
+  "sp500": {
+    "description": "S&P 500 daily OHLCV",
+    "source": "yfinance_global_index",
+    "index_name": "sp500",
+    "level": "daily"
+  },
+
+  "hang_seng": {
+    "description": "恒生指数 daily OHLCV",
+    "source": "yfinance_global_index",
+    "index_name": "hsi",
+    "level": "daily"
+  },
+
+  "nikkei225": {
+    "description": "日经225 daily OHLCV",
+    "source": "yfinance_global_index",
+    "index_name": "nikkei225",
+    "level": "daily"
+  },
+
+  "census_population": {
+    "description": "七普常住人口 (city-level)",
+    "source": "census",
+    "census_indicator": "total_population",
+    "census_year": 2020,
+    "level": "city"
+  },
+
+  "census_sex_ratio": {
+    "description": "七普性别比 (city-level)",
+    "source": "census",
+    "census_indicator": "sex_ratio",
+    "census_year": 2020,
+    "level": "city"
+  },
+
+  "census_elderly_ratio": {
+    "description": "七普老龄化率 60+ (city-level)",
+    "source": "census",
+    "census_indicator": "age_60_plus_pct",
+    "census_year": 2020,
+    "level": "city"
+  },
+
+  "census_urbanization": {
+    "description": "七普城镇化率 (city-level)",
+    "source": "census",
+    "census_indicator": "urbanization_rate",
+    "census_year": 2020,
+    "level": "city"
+  },
+
+  "census_college_edu": {
+    "description": "七普大专及以上占比 (city-level)",
+    "source": "census",
+    "census_indicator": "college_edu_pct",
+    "census_year": 2020,
+    "level": "city"
+  },
+
+  "nbs_city_gdp": {
+    "description": "城市GDP via 国家统计局 API",
+    "source": "nbs",
+    "nbs_indicator": "gdp",
+    "level": "city"
+  },
+
+  "nbs_city_population": {
+    "description": "城市常住人口 via 国家统计局 API",
+    "source": "nbs",
+    "nbs_indicator": "population",
+    "level": "city"
+  },
+
+  "nbs_cpi": {
+    "description": "CPI via 国家统计局 API",
+    "source": "nbs",
+    "nbs_indicator": "cpi",
+    "level": "nation"
+  },
+
+  "fred_us_gdp": {
+    "description": "US GDP (FRED)",
+    "source": "fred",
+    "fred_series": "gdp"
+  },
+
+  "fred_unemployment": {
+    "description": "US Unemployment Rate (FRED)",
+    "source": "fred",
+    "fred_series": "unemployment_rate"
+  },
+
+  "fred_fed_funds": {
+    "description": "Federal Funds Rate (FRED)",
+    "source": "fred",
+    "fred_series": "federal_funds_rate"
+  },
+
+  "fred_cpi": {
+    "description": "US CPI (FRED)",
+    "source": "fred",
+    "fred_series": "cpi"
+  },
+
+  "oecd_gdp": {
+    "description": "OECD quarterly GDP",
+    "source": "oecd",
+    "oecd_dataset": "gdp_quarterly",
+    "countries": ["usa", "gbr", "deu", "jpn"]
+  },
+
+  "oecd_unemployment": {
+    "description": "OECD unemployment rate",
+    "source": "oecd",
+    "oecd_dataset": "unemployment_rate",
+    "countries": ["usa", "gbr", "deu", "fra"]
+  },
+
+  "oecd_cpi": {
+    "description": "OECD CPI",
+    "source": "oecd",
+    "oecd_dataset": "cpi",
+    "countries": ["usa", "gbr", "deu", "fra"]
+  },
+
+  "eurostat_gdp": {
+    "description": "Eurostat GDP",
+    "source": "eurostat",
+    "eurostat_dataset": "gdp",
+    "countries": ["DE", "FR", "IT", "ES"]
+  },
+
+  "eurostat_unemployment": {
+    "description": "Eurostat unemployment rate",
+    "source": "eurostat",
+    "eurostat_dataset": "unemployment",
+    "countries": ["DE", "FR", "IT", "ES"]
+  },
+
+  "nyc_yellow_taxi": {
+    "description": "NYC yellow taxi trip records (AWS Open Data)",
+    "source": "nyc_taxi",
+    "taxi_dataset": "yellow",
+    "data_year": 2024,
+    "data_month": 1,
+    "sample_rows": 50000
+  },
+
+  "nyc_taxi_monthly_revenue": {
+    "description": "NYC yellow taxi monthly total fare revenue",
+    "source": "nyc_taxi_agg",
+    "taxi_dataset": "yellow",
+    "data_year": 2024,
+    "agg_col": "total_amount",
+    "agg_func": "sum"
+  },
+
+  "nyc_uber_lyft_trips": {
+    "description": "NYC Uber/Lyft trip records (high-volume FHV)",
+    "source": "nyc_taxi",
+    "taxi_dataset": "fhvhv",
+    "data_year": 2024,
+    "data_month": 1
+  },
+
+  "citi_bike_trips": {
+    "description": "Citi Bike NYC trip records",
+    "source": "citi_bike",
+    "data_year": 2024,
+    "data_month": 1
+  },
+
+  "epa_pm25_ny": {
+    "description": "EPA PM2.5 daily monitor data — New York State",
+    "source": "epa_aqs",
+    "epa_param": "pm25",
+    "state_code": "36"
+  },
+
+  "epa_pm25_ca": {
+    "description": "EPA PM2.5 daily monitor data — California",
+    "source": "epa_aqs",
+    "epa_param": "pm25",
+    "state_code": "06"
+  },
+
+  "epa_ozone_ny": {
+    "description": "EPA ozone daily monitor data — New York State",
+    "source": "epa_aqs",
+    "epa_param": "ozone",
+    "state_code": "36"
+  },
+
+  "noaa_nyc_weather": {
+    "description": "NOAA daily weather — NYC Central Park",
+    "source": "noaa_gsod",
+    "station_id": "725030"
+  },
+
+  "noaa_chicago_weather": {
+    "description": "NOAA daily weather — Chicago O'Hare",
+    "source": "noaa_gsod",
+    "station_id": "725300"
+  },
+
+  "noaa_la_weather": {
+    "description": "NOAA daily weather — Los Angeles LAX",
+    "source": "noaa_gsod",
+    "station_id": "722950"
+  },
+
+  "bls_unemployment": {
+    "description": "BLS national unemployment rate",
+    "source": "bls",
+    "bls_series": "unemployment_national"
+  },
+
+  "bls_cpi": {
+    "description": "BLS CPI All Urban Consumers",
+    "source": "bls",
+    "bls_series": "cpi_all_urban"
+  },
+
+  "bls_earnings": {
+    "description": "BLS average hourly earnings",
+    "source": "bls",
+    "bls_series": "avg_hourly_earnings"
+  },
+
+  "fec_candidates": {
+    "description": "FEC campaign finance — candidates",
+    "source": "fec",
+    "fec_endpoint": "candidates",
+    "fec_params": {"election_year": 2024, "state": "NY"}
+  },
+
+  "zillow_nyc_home_values": {
+    "description": "Zillow Home Value Index — NYC metro",
+    "source": "zillow",
+    "zillow_geography": "metro",
+    "zillow_geoname": "New York, NY"
+  },
+
+  "zillow_sf_home_values": {
+    "description": "Zillow Home Value Index — SF metro",
+    "source": "zillow",
+    "zillow_geography": "metro",
+    "zillow_geoname": "San Francisco, CA"
+  },
+
+  "nyc_311_noise": {
+    "description": "NYC 311 noise complaints",
+    "source": "nyc_311",
+    "complaint_type": "Noise - Residential",
+    "limit": 10000
+  },
+
+  "chicago_crimes_theft": {
+    "description": "Chicago crime incidents — theft",
+    "source": "chicago_crimes",
+    "data_year": 2024,
+    "crime_type": "THEFT",
+    "limit": 10000
+  }
+}

@@ -1,5 +1,170 @@
 # 修改日志
 
+## 2026-06-03 (晚间 - 决策树完善)
+
+### 新 Rule 3：工具变量自动路由
+
+`classify_mechanism()` 新增 Rule 3：当 `q7.has_plausible_instrument == True` 时，自动路由到 `time_varying_unobservables`（IV/SCM 族），优先于 DID 族规则。IV 提供比平行趋势更强的识别力度。
+
+同时：
+- `has_instrument` 不再硬编码为 False，改为从 `q7` 读取
+- `unobservables_risk` 标志：DID 族命中但无 IV 时，警告"识别完全依赖平行趋势"
+- 所有 8 个分支函数的 fallback 列表都加入了 IV/2SLS 备选
+
+### 混合机制检测
+
+新增 `_detect_secondary_features()`：在 Level 1 分类完成后，扫描 q2-q7，收集存在但被主规则覆盖的特征（如阈值规则下的交错时间维度），转化为备选策略自动追加到 Level 2 输出。
+
+- 8 个 `return` 统一通过 `_finalize_classification()` 包装，自动调用特征检测
+- `_secondary_features_to_fallbacks()` 将次要特征转为 Fallback 对象
+- 所有 8 个分支函数在返回前同步次要特征到 fallback 列表
+- 主推荐方法不受影响（确定性保证），但备选列表自动扩充
+
+示例：有阈值+交错时间+强度差异的政策，主推荐 Sharp RDD，备选自动包含 C&S staggered DID + Intensity DID + DDD + never-treated control。
+
+### 新增 Synthetic DID
+
+- 新脚本 `run_synthetic_did.py`：实现 Arkhangelsky et al. (2021)
+  - 最优控制单元权重（约束优化）
+  - 时间权重平衡处理前趋势
+  - 安慰剂推断（逐单元施加处理，构建零分布）
+  - 支持单或多处理单元
+- `_branch_single_policy_shock` 无对照组路径：主推荐从 SCM 改为 Synthetic DID
+- `run_pipeline.py` 新增 `run_synthetic_did.py` 路由
+- `method_guide.md` 新增 Synthetic DID 条目；SKILL.md 新增 Stage 7 用法
+
+## 2026-06-03 (下午 - 决策树重构)
+
+### 双层决策树：从扁平 if-else 到真正的两级决策
+
+**之前的架构**：`decide_method()` 是一个扁平的大函数，LLM 在 Stage 2 读完报告后手工把政策特征翻译成 CLI flag 传给 Stage 3。`mechanism` 和 `high_dimensional` 是两个独立入口，但产生相同推荐。
+
+**现在的架构**：
+
+```
+Stage 2 (LLM)                        Stage 3 (确定性脚本)
+─────────────                        ─────────────────────
+叙事报告                               Level 1: classify_mechanism()
+  ↓                                    ├── Rule 1: 随机分配？
+结构化事实 JSON                           ├── Rule 2: 阈值规则？
+  {                                     ├── Rule 3: 无时间维度？
+    q1_assignment: ...                  ├── Rule 4: 多政策叠加？
+    q2_threshold: ...                   ├── Rule 5: 连续强度？
+    q3_timing: ...                      ├── Rule 6: 交错时间？
+    ...                                 └── Rule 7: 单次冲击？
+  }                                       ↓
+  ↓                                    Level 2: decide_method()
+  ────────────→ --from-facts ───────→   ├── _branch_threshold()
+                                         ├── _branch_selection_on_observables()
+                                         ├── _branch_single_policy_shock()
+                                         ├── _branch_staggered_policy_shock()
+                                         └── ... (8 个分支函数)
+```
+
+**关键改动**：
+
+1. **Level 1 现在是代码而非人工判断**：`classify_mechanism()` 读入 Stage 2 的 7 个事实问题，用优先级规则链自动判定机制类型。7 条规则按识别力度排序（随机 > 阈值 > 无时间维度 > 多政策 > 连续强度 > 交错 > 单次）。
+
+2. **Stage 2 输出结构化事实而非方法论标签**：新的 `stage2_facts.json` 模板包含 7 个问题，每个问题只要求观察政策设计（"是抽签决定的吗？""有分数线吗？""什么时候开始的？"），不要求方法论知识。
+
+3. **删除 `high_dimensional` 伪机制**：高维控制变量不是分配机制，是数据特征。现在统一为 `selection_on_observables` 下的 `high_dimensional_controls` flag。
+
+4. **两个 CLI 入口**：
+   - `--from-facts stage2_facts.json` → 运行完整的 Level 1 + Level 2
+   - `--mechanism X` → 只运行 Level 2（向后兼容，或 LLM 已知机制类型时使用）
+
+5. **每个分支附带数据兼容性警告**：如果用户选了 `selection_on_observables` 但有面板数据，系统会提示"为什么不考虑 DID？"
+
+6. **Stage 3 的 SKILL.md 文档大幅精简**：旧的 170 行手动决策树被移除，替换为两级架构说明和脚本用法。决策逻辑的权威来源是脚本代码本身。
+
+## 2026-06-03 (下午 - ML 方法)
+
+### 新增因果机器学习方法
+
+**新增脚本：**
+
+1. **`run_dml.py`** — Double/Debiased Machine Learning (Chernozhukov et al. 2018)
+   - 双引擎：econml.LinearDML（首选）+ 手动 sklearn 实现（fallback）
+   - 支持多种 ML 后端：RandomForest / GradientBoosting / Lasso / Linear
+   - Neyman 正交得分 + K-fold cross-fitting 消除过拟合偏差
+   - 有效推断：ML 模型不需要正确设定，只需 n^(-1/4) 收敛速度
+   - 自动检测处理变量类型（二值 / 连续）
+   - CATE 估计 + 分组异质性分析
+   - 干扰模型 CV R² 诊断
+   - 适用于高维控制变量场景（控制变量 > 15-20 个）
+
+2. **`run_causal_forest.py`** — Causal Forest (Wager & Athey 2018, Athey et al. 2019)
+   - 双引擎：econml.CausalForestDML + 手动 SimpleCausalForest
+   - Honest estimation：一半样本建树，一半样本估计叶节点效应
+   - CATE 分布：均值/SD/分位数/正效应占比
+   - 变量重要性：哪些特征驱动处理效应异质性
+   - Best Linear Projection：哪些变量系统性预测更大的处理效应
+   - 分组 CATE：按特征四分位数/类别分组
+   - 可视化：CATE 直方图 + 变量重要性 + BLP 系数图
+
+### Stage 3 决策树更新
+
+- 新增 `high_dimensional` assignment mechanism：高维控制变量下推荐 DML
+- `selection_on_observables` 机制新增 `--high-dimensional-controls` 标志
+- DML 作为 PSM/IPW 的首选替代方案（当控制变量多时）
+- Causal Forest 作为各方法的 Stage 7+ 异质性分析推荐
+
+### 文档更新
+
+- `SKILL.md` Stage 7 新增 ML Methods 章节（DML + Causal Forest 用法）
+- `method_guide.md` 新增 DML 和 Causal Forest 方法条目
+- folder structure 新增两个脚本
+
+## 2026-06-03 (上午 - 紧急修复和重要新增)
+
+### 紧急修复：`run_staggered_did.py` 方法论重写
+
+原脚本用简单 OLS + Entity/Time FE 近似 C&S 估计，存在三个方法论问题：
+1. C&S (2021) 的核心贡献是**双重稳健估计**（倾向得分 IPW + 结果回归），不是简单 OLS
+2. 标准误未考虑多阶段估计的不确定性
+3. 未估计倾向得分，未做协变量调整
+
+重写后的实现：
+- **倾向得分估计**：sklearn LogisticRegression 估计 P(cohort_g | X)
+- **双重稳健 ATT(g,t)**：IPW 加权 + 结果回归调整 + 影响函数标准误
+- **Bootstrap 选项**：entity-level cluster bootstrap 用于置信区间
+- **事件研究聚合**：按相对时间合并 cohort-specific ATT
+- **Sun & Abraham (2021)**：交互加权估计，各 cohort 独立事件研究后加权平均
+
+### 重要新增
+
+**新增脚本：**
+
+1. **`sensitivity_analysis.py`** — 五项敏感性检验：
+   - Oster (2019) bounds：δ 值，不可观测因素需要多强才能解释掉处理效应
+   - 系数稳定性：逐步加入控制变量，追踪系数变化
+   - Rosenbaum bounds：Γ 值，匹配设计中隐藏偏差的敏感度
+   - Placebo-in-time：将处理时间前移，检验是否有虚假"效应"
+   - Leave-one-out influence：逐单位剔除，识别影响点
+
+2. **`run_pipeline.py`** — 流水线编排器：
+   - 自动检测当前阶段并继续执行
+   - 支持从任意阶段重启（`--from-stage N`）
+   - JSON 状态文件追踪所有阶段输出
+   - Dry-run 模式预览命令
+   - `--status` 查看完成进度
+
+3. **`validate_data.py`** — 数据验证（Stage 5→6 之间）：
+   - 面板结构检查（平衡性、重复行、时间间隔）
+   - 缺失值分析（单变量 + 联合缺失 + 时间维度）
+   - 异常值检测（IQR / z-score）
+   - 变量类型和范围验证
+   - 处理变量逻辑一致性（treated 不随时间变化、post 不在 treated 前出现等）
+   - 处理前数据充分性（至少 2 期处理前结果数据）
+
+### SKILL.md 更新
+
+- Stage 5 新增数据验证步骤
+- Stage 7 示例改为新的 DR 估计器
+- Stage 8 新增敏感性分析（含 Oster/Rosenbaum/placebo-in-time）
+- 文件夹结构中新增 4 个脚本
+- 新增 Pipeline orchestration 章节
+
 ## 2026-05-29
 
 ### 流程重构：8 阶段 → 9 阶段

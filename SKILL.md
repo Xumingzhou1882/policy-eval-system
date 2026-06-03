@@ -98,6 +98,89 @@ Policy Background Report: [Policy Name]
 
 Note: Do NOT propose method candidates at this stage. That is Stage 3.
 
+### Structured facts output (required before Stage 3)
+
+After the narrative report, the LLM MUST produce a structured facts file at `data/auto/stage2_facts.json`. This file contains ONLY observable facts about the policy design — no methodological judgments. The facts answer 7 questions that any policy researcher can determine from public documents:
+
+```json
+{
+  "policy_name": "Long-term Care Insurance Pilot",
+  "outcome": "Fertility Rate",
+
+  "q1_assignment": {
+    "how_is_treatment_assigned": "by_policy_timing",
+    "_options": ["by_lottery", "by_threshold_score", "by_observed_characteristics", "by_policy_timing"],
+    "evidence": "The central government selected pilot cities in two batches based on city-level economic and demographic characteristics. Not random, no single eligibility score."
+  },
+
+  "q2_threshold": {
+    "has_eligibility_threshold": false,
+    "_note": "Only fill if q1='by_threshold_score'. Was there a continuous score with a sharp cutoff? (e.g., exam score ≥ 600, income ≤ poverty line, vehicle range ≥ 400km)",
+    "threshold_variable": null,
+    "cutoff_value": null,
+    "compliance_is_perfect": null
+  },
+
+  "q3_timing": {
+    "has_known_start_time": true,
+    "treatment_starts_at_different_times": true,
+    "first_treatment_time": 2016,
+    "last_treatment_time": 2020,
+    "_note": "Was the policy announced and implemented at a known point in time, creating a before/after comparison? Were all treated units treated at the same time, or in batches?",
+    "timing_detail": "Batch 1: 15 cities in 2016. Batch 2: 14 cities in 2020. Some cities never participated."
+  },
+
+  "q4_control_group": {
+    "has_never_treated_units": true,
+    "all_units_eventually_treated": false,
+    "why_some_never_treated": "The pilot program only covered specific cities. Many cities were never selected for the pilot.",
+    "_note": "Are there units that NEVER receive treatment? Or does every unit eventually get treated, just at different times?"
+  },
+
+  "q5_treatment_type": {
+    "is_binary": true,
+    "has_intensity_variation": false,
+    "intensity_detail": null,
+    "_note": "Does every treated unit get the same treatment (binary)? Or do different units get different doses/intensities? (e.g., different subsidy amounts, different coverage levels)"
+  },
+
+  "q6_concurrent_policies": {
+    "has_overlapping_policies": false,
+    "overlapping_list": [],
+    "can_be_separated": null,
+    "_note": "During the same period, are there OTHER policies that could affect the SAME outcome? If yes, can we separate their effects (e.g., by region or timing)?"
+  },
+
+  "q7_instrument": {
+    "has_plausible_instrument": false,
+    "instrument_description": null,
+    "_note": "Is there a variable that affects whether a unit is treated, but does NOT directly affect the outcome? (e.g., distance to college for education; wind direction for pollution)"
+  }
+}
+```
+
+Each question is answered from observable policy facts. The `_note` and `_options` fields are documentation for the LLM — they guide the LLM toward correct answers without requiring causal inference expertise. The actual values are factual:
+
+- **how_is_treatment_assigned**: pick one of the four options from what you observe about the policy design
+- **q3_timing**: look at when the policy was announced and implemented — does it create before/after?
+- **q4_control_group**: look at who is covered — are there units left out? permanently or temporarily?
+- **q5_treatment_type**: look at what the treatment actually is — same for everyone, or different doses?
+- **q6_concurrent_policies**: search for other policies in the same domain during the same period
+- **q7_instrument**: this one requires some economic reasoning, but the question is factual: is there a known external factor that shifted treatment exposure?
+
+Save this file:
+```bash
+# The LLM writes this file after completing Stage 2 research
+# Path: data/auto/stage2_facts.json
+```
+
+Then pass it to Stage 3:
+```bash
+python scripts/stage3_analyze.py --from-facts data/auto/stage2_facts.json
+```
+
+This replaces the previous approach where the LLM manually translated policy research into CLI flags. Now Stage 3 reads the facts and determines both the mechanism (Level 1) and the specific method (Level 2) deterministically.
+
 ### When to ask the user
 
 Only ask when the information is genuinely unavailable from public sources. For example:
@@ -123,138 +206,71 @@ Format each question with:
 
 This stage does NOT consider data availability. It answers: what should we do, in an ideal world?
 
-### Step 1: Characterize the assignment mechanism
+### Two-level decision tree
 
-From the policy research in Stage 2, identify which of the following best describes how treatment was assigned:
+The decision runs in two levels, both implemented deterministically in `stage3_analyze.py`:
 
-| Assignment mechanism | What it means | Implied variation |
-|---|---|---|
-| **Random assignment** | Lottery, randomized experiment, or natural randomization | Random — direct comparison is valid |
-| **Threshold rule** | A continuous score determines eligibility with a sharp cutoff | Discontinuity at the threshold |
-| **Selection on observables** | Treatment depends on characteristics we can measure and control for | Within-group comparisons after conditioning |
-| **Selection on time-invariant unobservables** | Units differ in fixed ways; treatment is a policy shock at a known time | Within-unit change over time, across-unit difference in timing |
-| **Selection on time-varying unobservables** | Confounding factors change over time and differ across units | Instrument-based, or synthetic counterfactual |
-| **Continuous exposure intensity** | Different units receive different doses/intensities of the same policy | Dose-response variation |
-| **Multiple overlapping policies** | Several policies affect the same units concurrently | Differential exposure across policies |
+**Level 1 — Facts → Mechanism**: Reads the Stage 2 structured facts (`data/auto/stage2_facts.json`). Classifies the assignment mechanism based on observable policy features. No methodological knowledge needed — pure rule-based classification.
 
-### Step 2: Select the theoretical identification strategy
+**Level 2 — Mechanism → Method**: Given a mechanism type and data structure flags, selects the specific identification strategy, enumerates assumptions, lists fallbacks, and previews required data.
 
-Start from the assignment mechanism. Trace through the decision logic:
+Priority order for Level 1 classification (early rules dominate):
+1. Random assignment → randomization inference
+2. Known eligibility threshold → RDD (sharp or fuzzy)
+3. Plausible instrument identified → IV / SCM (time-varying unobservables)
+4. No time dimension → selection on observables (matching / ML)
+5. Multiple overlapping policies → DDD
+6. Continuous treatment intensity → intensity DID
+7. Known policy timing + staggered → C&S staggered DID
+8. Known policy timing + single → standard DID
 
-```
-Q1: How is treatment assigned?
+Rule 3 is new: when Stage 2 research identifies a plausible instrument (q7), the system
+routes to the IV/SCM family regardless of whether DID timing features are present — an
+instrument provides a stronger source of identifying variation than staggered or single DID.
+When no instrument is found, DID-family classifications carry an `unobservables_risk` flag
+that surfaces in the Stage 3 output and strengthens SCM fallback recommendations.
 
-A. Random assignment
-  └── Experimental analysis (randomization inference, Fisher exact test)
-      Rationale: Randomization breaks the link between treatment and confounders.
-      Key assumption: No selective attrition, no spillover (SUTVA).
+### Mixed mechanisms (secondary features)
 
-B. A known continuous threshold determines eligibility
-  ├── Sharp RDD: treatment probability jumps from 0 to 1 at cutoff
-  └── Fuzzy RDD: treatment probability jumps by less than 1 at cutoff
-      Rationale: Units just above and below the threshold are as-good-as-random.
-      Key assumption: No precise manipulation of the running variable (McCrary test).
-      If manipulation suspected → donut-hole RDD or switch to another strategy.
+When a policy has multiple features but only the highest-priority one determines the
+primary mechanism, the remaining features are NOT discarded. `classify_mechanism()` runs
+`_detect_secondary_features()` at each return point, scanning q2-q7 for features that
+exist but were overridden by the primary rule. These are returned as `secondary_features`
+and automatically appended as additional fallback strategies in the Level 2 output.
 
-C. Treatment depends on observables (no time dimension, or cross-section only)
-  ├── Treatment/control overlap is good → PSM, IPW, or doubly-robust (AIPW)
-  ├── Covariate balance is the priority → CEM, entropy balancing
-  └── No overlap (extrapolation required) → Not identifiable; flag as major limitation
-      Rationale: If we can measure what drives selection, we can condition on it.
-      Key assumption: Unconfoundedness (CIA / selection on observables).
-      Cannot be directly tested — must be argued from institutional knowledge.
+For example, a new energy vehicle subsidy with both a range threshold (≥400km) and
+staggered phase-out timing will classify as `threshold_rule` → Sharp RDD as primary,
+but the Stage 3 output will also list C&S staggered DID, Intensity DID, and never-treated
+control as fallbacks — ready for Stage 6 if the McCrary test fails.
 
-D. Treatment is a policy shock at a known time, affecting some units but not others
-  ├── Single treatment time, clear treated/untreated groups
-  │   └── Standard DID (two-way fixed effects)
-  │       Key assumption: Parallel trends — in the absence of treatment, treated
-  │       and untreated would have followed the same path.
-  ├── Staggered adoption (different units treated at different times)
-  │   └── Heterogeneity-robust DiD estimators:
-  │       - Callaway & Sant'Anna (2021): group-time average treatment effects
-  │       - Sun & Abraham (2021): cohort-specific ATT, never-treated as control
-  │       - Borusyak, Jaravel & Spiess (2024): imputation-based
-  │       - de Chaisemartin & D'Haultfoeuille (2020): instantaneous switchers
-  │       Note: Traditional TWFE is NOT recommended for staggered designs.
-  │       It can produce negative weights when treatment effects are heterogeneous.
-  │       Key assumption: Parallel trends, no anticipation, no spillover.
-  └── No clear untreated group (everyone gets treated eventually)
-      └── Consider the earlier-treated as control for later-treated (C&S approach),
-          but recognize this only identifies effects for the later-treated group
-          over the window before they themselves are treated.
+This means:
+- Primary method stays deterministic (same input → same output)
+- Secondary features are surfaced transparently in the Stage 3 report
+- Stage 6 has ready-made alternative strategies without re-running Stage 2-3
+- No LLM reasoning is involved — feature detection is purely rule-based
 
-E. Selection on unobservables that may be time-varying
-  ├── A valid instrument exists (affects treatment but not outcome directly)
-  │   └── IV / 2SLS (with weak-instrument diagnostics: Montiel Olea & Pflueger 2013)
-  │       Estimates LATE for compliers.
-  │       Key assumption: Exclusion restriction — the instrument only affects the
-  │       outcome through treatment. Must be argued, cannot be formally tested.
-  ├── No instrument available
-  │   ├── A few treated units, many untreated → Synthetic Control Method (SCM)
-  │   │     Constructs a weighted combination of untreated units as counterfactual.
-  │   │     Key assumption: Pre-treatment fit quality, no unobserved time-varying
-  │   │     confounders during the post-treatment period.
-  │   ├── Panel data with many units → Interactive fixed effects (Bai 2009),
-  │   │     Generalized SCM (Xu 2017), Matrix completion (Athey et al. 2021)
-  │   │     Key assumption: Factor structure captures unobserved confounding.
-  │   └── No panel → Not identifiable without stronger assumptions.
-  └── A threshold exists but compliance is imperfect → Fuzzy RDD = IV
+### Running Stage 3
 
-F. Continuous treatment intensity (everyone is treated, but at different doses)
-  └── Intensity DID, or IV if a variable shifts intensity exogenously.
-      Careful: cross-sectional variation in intensity is often endogenous.
-      Need an argument for why the intensity variation is exogenous.
-      Key assumption: Parallel trends in the dose-response relationship.
+```bash
+# Full two-level: facts → mechanism → method (preferred path)
+python scripts/stage3_analyze.py --from-facts data/auto/stage2_facts.json \
+    --output data/auto/stage3_result.json
 
-G. Multiple policies overlapping in time
-  ├── Policies affect different groups differently → Triple difference (DDD)
-  │     Compares the DID estimate in a group exposed to both policies vs.
-  │     the DID estimate in a group exposed to only one.
-  ├── Policies are separable → Control for the other policy as a covariate
-  └── Policies are inseparable → Flag as fundamental identification problem
+# Level 2 only: mechanism already known (backward compatibility)
+python scripts/stage3_analyze.py --mechanism staggered_policy_shock \
+    --has-control-group --output data/auto/stage3_result.json
 ```
 
-### Step 3: The theoretical method report
+The script outputs:
+- Level 1 classification reasoning (which rules fired and why)
+- Primary theoretical recommendation with full justification
+- All identifying assumptions (testable vs. argument-based)
+- Ranked fallback strategies with conditions
+- Required and optional data variables (preview for Stage 4)
+- Heterogeneity analysis recommendation (Causal Forest) as supplement
+- Data compatibility warnings (e.g., "DID requires panel data")
 
-Output a formal justification:
-
-```
-═══════════════════════════════════
-Theoretical Method Analysis
-═══════════════════════════════════
-
-Policy: [Policy name]
-Assignment mechanism: [Which type from Step 1]
-
-Why this mechanism:
-[2-3 sentences connecting the policy design to the mechanism type.
- Cite specific institutional facts from Stage 2.]
-
-Primary theoretical recommendation: [Method name]
-
-Why:
-├── Source of variation: [What variation identifies the causal effect]
-├── Theoretically addresses: [What bias would otherwise exist]
-└── Literature basis: [This method is standard for this assignment mechanism]
-
-Key identifying assumptions (theoretical — not yet checked against data):
-├── [Assumption 1] → Testable with data? → [Yes (method) / No (argument required)]
-├── [Assumption 2] → Testable with data? → [Yes (method) / No (argument required)]
-└── [Assumption 3] → Testable with data? → [Yes (method) / No (argument required)]
-
-If the primary strategy fails (e.g., assumption violated by data),
-fallback strategies:
-├── Fallback 1: [Method] — applicable if [condition]
-├── Fallback 2: [Method] — applicable if [condition]
-└── Worst case: [Method] — weaker but still informative
-
-What this method requires from the data (preview for Stage 4):
-├── Essential: [Variable 1, Variable 2, ...]
-└── Optional: [Variable 3, Variable 4, ...]
-
-Do you approve this theoretical framework?
-═══════════════════════════════════
-```
+The script is **deterministic**: same facts always produce the same mechanism, same mechanism + same flags always produce the same method. This guarantees consistency across sessions.
 
 ### Why theory comes before data
 
@@ -265,32 +281,6 @@ Reversing the order — looking at available data first, then choosing a method 
 3. **Opaque compromises**: the reader cannot distinguish "we chose this method because it's correct" from "we chose this method because it's what our data allowed."
 
 By fixing the theoretical method first, any later deviation due to data constraints is explicit and traceable. Stage 6 will document the gap between "should have used" and "actually used."
-
-### Step 4: Run the deterministic decision engine
-
-After the LLM characterizes the assignment mechanism, run the decision engine to produce a deterministic recommendation:
-
-```bash
-python scripts/stage3_analyze.py \
-    --mechanism staggered_policy_shock \
-    --staggered \
-    --has-control-group \
-    --policy "Policy Name" \
-    --outcome "Outcome Variable" \
-    --output stage3_result.json
-```
-
-The script is **deterministic**: same inputs always produce the same output. This guarantees consistency across sessions and prevents the LLM's reasoning from drifting over time.
-
-The LLM's role is to:
-1. Extract the assignment mechanism type and flags from Stage 2 research
-2. Feed them into the script
-3. Present the output to the user for approval
-
-The script's role is to:
-1. Apply the fixed decision tree to select the primary method
-2. Enumerate assumptions, fallbacks, and required variables
-3. Output structured JSON for later stages to consume
 
 Do not proceed until the user confirms.
 
@@ -351,27 +341,79 @@ If Tier A: "I will auto-fetch this in Stage 5."
 
 | Tier | Source type | Action |
 |---|---|---|
-| **A** | Public API / open data | LLM writes fetch code on-the-fly using `akshare`, `pandas_datareader`, `requests`, etc. |
+| **A** | Public API / open data | Look up variable in `variable_map.json`, call pre-written function in `fetch_data.py` |
 | **B** | Requires registration (micro surveys, proprietary databases) | Generate instructions; wait for user to place data in `data/raw/` |
 | **C** | Manual collection (policy documents, local yearbooks) | Provide Excel template, tell user exactly what to fill in |
 | **D** | Does not exist / inaccessible | Honestly report and suggest alternatives |
 
-### Tier A: LLM writes fetch code on-the-fly
+### Tier A: Configuration-driven (no ad-hoc code)
 
-No fixed fetch scripts. For each data source identified in Stage 4, the LLM writes a short Python script tailored to that specific source:
+`scripts/fetch_data.py` is **configuration-driven**. Most akshare data sources are
+fetched by a single generic engine `fetch_akshare(entry)` — the entry dict comes
+directly from `variable_map.json`. Custom functions exist only for non-trivial cases
+(year-loop, different API):
 
-```python
-# Example: fetch data from a public API (package varies by data source)
-import pandas as pd
-# from package import function  # depends on the data source
+| Function | When used | Example config entries |
+|---|---|---|
+| `fetch_akshare(entry)` | Most akshare calls — function + rename + transform | `shanghai_index`, `cny_usd`, `pmi`, `bond_yield_curve`, `money_supply`, `shibor`, `lpr`, `house_price_70cities` |
+| `fetch_wb_indicator(code, countries, years)` | World Bank API | `gdp`, `population`, `fertility_rate` |
+| `fetch_cn_city_macro(indicator, years)` | City-level data (year-loop) | `city_gdp`, `city_population`, `city_fiscal_revenue` |
+| `fetch_cn_province_macro(indicator, years)` | Province-level data (year-loop) | `province_gdp`, `province_population`, `province_cpi` |
+| `fetch_cn_aqi(city, start, end)` | Air quality (city-loop) | `aqi_city` |
+| `fetch_global_stock_index(name, start, end)` | yfinance | `sp500`, `hang_seng`, `nikkei225` |
+| `fetch_from_variable_map(variables, ...)` | Batch from variable_map.json | One-call fetch for multiple variables |
 
-df = some_api_fetch()  # LLM writes this per project
-df.to_json("data/auto/variable_name.json", orient="records", force_ascii=False)
+**Adding a new data source is a JSON config change, not a Python code change:**
+```json
+{
+  "new_variable": {
+    "description": "描述",
+    "source": "akshare",
+    "level": "daily",
+    "akshare": {
+      "func": "akshare_function_name",
+      "kwargs": {"param": "value"},
+      "rename": {"中文列名": "english_name"},
+      "entity_id": "constant_id",
+      "output_cols": ["entity_id", "date", "value"]
+    }
+  }
+}
 ```
 
-```
+If the data needs reshaping (wide→long, column detection), add a `"transform"`
+field referencing one of the 3 built-in transforms: `wide_to_long`, `exchange_rate`,
+`pmi`.
 
-After fetching, output what was obtained and what's still missing.
+### Variable map: the Stage 4 → Stage 5 bridge
+
+`references/variable_map.json` contains 52+ entries covering macro, financial,
+and environmental data. The LLM's job in Stage 5 is:
+
+1. Read the Stage 4 data requirements (essential + optional variables)
+2. Match each variable to an entry in `variable_map.json`
+3. Call the corresponding function in `fetch_data.py`
+4. Variables without a match → Tier B/C gap report
+
+```bash
+# Single indicator
+python scripts/fetch_data.py --source wb --indicator gdp_per_capita \
+    --countries CN --start 2010 --end 2020
+
+# China city-level data
+python scripts/fetch_data.py --source akshare_city --indicator gdp \
+    --start 2015 --end 2020
+
+# Batch from variable map
+python scripts/fetch_data.py --from-map gdp,population,fertility_rate \
+    --region cn --start 2010 --end 2020
+
+# Stock index
+python scripts/fetch_data.py --source akshare_stock_index --indicator shanghai_composite
+
+# Individual stock
+python scripts/fetch_data.py --source akshare_stock_individual --indicator 600519
+```
 
 ### Gap report format
 
@@ -383,23 +425,25 @@ Data Gap Report
 ═══════════════════════════════════
 
 Auto-fetched (✓):
-├── Variable A from public API
-├── Variable B from statistical database
-└── Geographic identifier mapping
+├── gdp → fetch_wb_indicator("NY.GDP.MKTP.CD") → 280 rows ✓
+├── population → fetch_wb_indicator("SP.POP.TOTL") → 280 rows ✓
+├── city_gdp → fetch_cn_city_macro("gdp") → 3200 rows ✓
+└── fertility_rate → not in variable_map.json
 
 Still needed (manual):
-├── ✗ Variable C → Tier B (micro survey data)
-│     Application URL: [relevant data portal]
-│     System will draft the application text for you.
-│     Once approved, place data in data/raw/
+├── ✗ fertility_rate → Tier B (micro survey data: CFPS)
+│     Not available from public APIs at city level.
+│     Application URL: cfps.pku.edu.cn
+│     Once approved, place data in data/raw/fertility.csv
+│     Expected format: city_id, year, fertility_rate
 │
-├── ✗ Variable D → Tier C (manual collection)
-│     Template: data/manual/variable_d.xlsx
-│     Instructions: [specific instructions for the user]
+├── ✗ pilot_city_list → Tier C (manual collection)
+│     Template: data/manual/pilot_cities.xlsx (pre-populated with known dates)
+│     Instructions: Fill in the "?" cells only
 │
-└── ✗ Exact treatment dates → Tier C
+└── ✗ Exact treatment dates for batch 2 → Tier C
       Template: data/manual/treatment_dates.xlsx (pre-populated with known data)
-      Instructions: Fill in the "?" cells only
+      Instructions: Confirm or correct each date
 
 ═══════════════════════════════════
 ```
@@ -408,9 +452,96 @@ Still needed (manual):
 
 For every Tier C item, generate an Excel template in `data/manual/` using `openpyxl` or `pandas`. Pre-fill all known data, mark unknown cells with "?", and include a "source" column.
 
+### Post-acquisition validation
+
+After data is acquired (auto-fetched or manually provided), run data validation before proceeding:
+
+```bash
+python scripts/validate_data.py --data data/merged/panel.dta \
+    --entity city_id --time year \
+    --outcome log_fertility \
+    --treated treated --first-treated first_treated \
+    --controls gdp population \
+    --output data/auto/validation_report.json
+```
+
+This checks: panel balance, missing values, outliers, duplicate entity-time rows, variable type consistency, treatment variable logic, and pre-treatment data sufficiency. Fix critical issues before proceeding to Stage 6.
+
+### Tier B: Standard application instructions
+
+For variables that require registration (micro surveys, proprietary databases),
+output a structured application brief — not free-form text:
+
+```
+─────────────────────────────────
+Data Request: [Variable Name]
+─────────────────────────────────
+Data source:   [e.g., CFPS 2020 wave]
+Portal URL:    [application website]
+Requirements:  [e.g., institutional email, research proposal]
+Timeline:      [e.g., 2-4 weeks for approval]
+Access level:  [public microdata / restricted / on-site only]
+Variables needed: [list specific variable names from the codebook]
+Expected format after receipt: [entity_id, year, value]
+Target path:   data/raw/[filename].csv
+─────────────────────────────────
+```
+
+After presenting all Tier B items, ask the user: "Which of these can you apply for?"
+Do not proceed until the user confirms they've placed data in `data/raw/`.
+
+### Tier C: Standard Excel template
+
+For manually collected data (policy dates, city lists, yearbook values),
+generate one Excel file per variable in `data/manual/`:
+
+| Column | Content | Example |
+|---|---|---|
+| `entity_id` | Unit identifier | 110100 |
+| `year` | Time period | 2020 |
+| `value` | Variable value | 1234.56 |
+| `source` | Where this number came from | 北京市统计年鉴2021 p.45 |
+
+Pre-fill rules:
+- **Known data from Stage 2**: fill in directly (e.g., pilot city names, confirmed dates)
+- **Unknown cells**: leave blank (not "?" — blanks are easier to fill and won't break pandas)
+- **entity_id**: pre-populate from the entity map if available
+- **year**: pre-populate the full year range
+
+### Pipeline state tracking
+
+The pipeline state JSON (`--state` in `run_pipeline.py`) tracks each variable's
+acquisition status in `stages.stage5.data_status`:
+
+```json
+{
+  "stages": {
+    "stage5": {
+      "data_status": {
+        "gdp":              {"tier": "A", "status": "fetched",  "path": "data/auto/gdp.json"},
+        "population":       {"tier": "A", "status": "fetched",  "path": "data/auto/population.json"},
+        "fertility_rate":   {"tier": "B", "status": "requested","path": null},
+        "pilot_city_list":  {"tier": "C", "status": "pending",  "path": "data/manual/pilot_cities.xlsx"},
+        "education_level":  {"tier": "D", "status": "unavailable", "path": null}
+      }
+    }
+  }
+}
+```
+
+Status values: `fetched` | `cached` | `requested` | `received` | `pending` | `unavailable`
+
+This enables:
+- **Resume**: `run_pipeline.py --from-stage 5` checks status and only fetches missing variables
+- **Cache**: Tier A variables with status `fetched` are skipped on re-run (unless `--force`)
+- **Gap tracking**: The gap report is generated by filtering `data_status` for non-`fetched` entries
+
 ### Key principle
 
-Data acquisition is project-specific. The LLM writes, runs, and discards fetch code for each project. Fixed scripts are reserved for the estimation pipeline (Stages 6-8), where the logic is stable across projects.
+Tier A uses pre-written `fetch_data.py` functions — no ad-hoc code. Tier B/C
+follow fixed templates so the data contract between stages is predictable.
+The pipeline state file is the single source of truth for what data exists,
+what's pending, and what's unavailable.
 
 Wait for the user to say "data is ready" before proceeding to Stage 6.
 
@@ -535,27 +666,28 @@ Do not proceed until the user confirms.
 
 ### What the system does
 
-Run the main specification chosen in Stage 6:
+Run the main specification chosen in Stage 6. The estimation scripts support both analytic standard errors (influence-function based for doubly-robust estimators) and cluster-bootstrap inference.
 
-```python
-# Core regression (example for Callaway & Sant'Anna staggered DID)
-# Use the did package (R) or csdid Python port
-import pandas as pd
+```bash
+# Standard DID
+python scripts/run_did.py --data data/merged/panel.dta \
+    --outcome log_fertility --entity city_id --time year \
+    --treated treated --post post --controls gdp population
 
-df = pd.read_stata("data/merged/analysis_ready.dta")
-
-# Example: standard DID with TWFE (only if TWFE is valid — confirmed in Stage 6)
-from linearmodels import PanelOLS
-
-df["log_outcome"] = np.log(df["outcome"])
-df["treated_post"] = df["treated"] * df["post"]
-
-model = PanelOLS.from_formula(
-    "log_outcome ~ treated_post + control1 + control2 + EntityEffects + TimeEffects",
-    data=df.set_index(["city_id", "year"])
-)
-results = model.fit(cov_type="clustered", cluster_entity=True)
+# Callaway & Sant'Anna (2021) staggered DID with doubly-robust estimation
+python scripts/run_staggered_did.py --data data/merged/panel.dta \
+    --outcome log_fertility --entity city_id --time year \
+    --first-treated first_treated --method cs --control never-treated \
+    --controls gdp population --bootstrap 200
 ```
+
+The staggered DID script implements:
+- **Propensity score estimation** via logistic regression (P(cohort_g | covariates))
+- **Doubly-robust ATT(g,t)** combining IPW reweighting with outcome regression
+- **Influence-function standard errors** for valid inference
+- **Bootstrap option** for cluster-robust confidence intervals
+- **Event study** aggregation by relative time
+- **Cohort-specific and overall ATT** with size-based weighting
 
 Output the key result in plain language:
 
@@ -573,6 +705,53 @@ Also generate:
 - Event study plot (coefficient by relative time, with confidence intervals)
 - Raw means comparison plot (treated vs control over time)
 
+### Machine Learning Methods
+
+Two ML-based scripts complement the traditional econometric methods:
+
+**Double/Debiased Machine Learning (DML):**
+```bash
+python scripts/run_dml.py --data data/merged/panel.dta \
+    --outcome log_wage --treatment treated \
+    --controls age education experience occupation sector \
+    --ml-model gradient_boosting --cv 5
+```
+DML uses flexible ML models (RandomForest, GradientBoosting, Lasso) for nuisance function estimation, with:
+- Neyman-orthogonal scores that debias ML predictions
+- K-fold cross-fitting to prevent overfitting bias
+- Valid inference under weak conditions (ML models don't need to be correctly specified)
+- CATE estimation as a byproduct
+- Preferred over PSM/IPW when the number of controls is large (>15-20)
+
+**Causal Forest (Heterogeneity Analysis):**
+```bash
+python scripts/run_causal_forest.py --data data/merged/panel.dta \
+    --outcome log_wage --treatment treated \
+    --features age education experience occupation sector \
+    --num-trees 2000 --plot cf_heterogeneity.png
+```
+Causal Forest (Athey & Imbens 2016, Wager & Athey 2018) estimates CATE for each unit:
+- Honest estimation with sample splitting
+- Variable importance for treatment effect heterogeneity drivers
+- Best Linear Projection (BLP) for systematic heterogeneity patterns
+- Quantile comparison (top vs. bottom quintile of CATE)
+- Run as a complement to any primary method in Stage 7
+
+**Synthetic Difference-in-Differences:**
+```bash
+python scripts/run_synthetic_did.py --data data/merged/panel.dta \
+    --outcome log_fertility --entity city_id --time year \
+    --treated-unit 110100 --first-treated 2016 \
+    --output data/auto/sd_result.json
+```
+Synthetic DID (Arkhangelsky et al. 2021) combines SCM-style unit weighting with DID time differencing:
+- Finds optimal control unit weights that match pre-treatment outcomes
+- Applies DID to the synthetic control, providing valid standard errors
+- Placebo-based inference on each donor unit builds a null distribution
+- Unlike traditional SCM, provides p-values and confidence intervals
+- Recommended when there is no untreated control group but many donor units exist
+- For multiple treated units, use `--treated-units` (comma-separated); results are aggregated
+
 ---
 
 ## Stage 8: Robustness checks
@@ -587,12 +766,37 @@ Also generate:
 | Alternative outcome | Is the result sensitive to measurement? | If multiple outcome measures exist, test each. |
 | Bacon-Decomp (staggered DID) | Are there negative weights? | Run Goodman-Bacon decomposition. Flag if negative weights > 10%. |
 | Parallel trends (pre-treatment) | Did treated and control diverge before treatment? | Event study: are pre-treatment coefficients jointly zero? |
+| **Sensitivity analysis** | Could unobservables explain the result away? | Oster bounds, coefficient stability, Rosenbaum bounds, placebo-in-time |
+| **Placebo-in-time** | Would we find an "effect" before the policy actually happened? | Shift treatment to earlier time periods; test if fake effects appear |
 
 For each check, report:
 ```
 ✓ [Check name]: Passed — [one-line interpretation]
 ✗ [Check name]: Failed — [what this means and what to do]
 ```
+
+### Sensitivity analysis (run after primary robustness checks)
+
+```bash
+python scripts/sensitivity_analysis.py --data data/merged/panel.dta \
+    --outcome log_fertility --entity city_id --time year \
+    --treated treated --post post \
+    --controls gdp population \
+    --treatment-col treated --first-treated 2016 \
+    --output data/auto/sensitivity.json
+```
+
+This runs five tests:
+
+1. **Oster (2019) bounds**: How strong would unobservables need to be (relative to observables) to explain away the treatment effect? Reports δ (delta) — the ratio of unobservable-to-observable selection strength needed to nullify the coefficient. δ > 1 means the result is robust.
+
+2. **Coefficient stability**: Tracks how the treatment coefficient changes as controls are added incrementally. A stable coefficient across specifications suggests robustness.
+
+3. **Rosenbaum bounds**: For matched/weighted designs, reports Γ (gamma) — the odds ratio of hidden bias needed to overturn significance. Γ > 2 is considered robust.
+
+4. **Placebo-in-time**: Shifts the treatment date to earlier periods. If significant "effects" appear before the real policy, the identifying assumptions are suspect.
+
+5. **Leave-one-out influence**: Re-estimates the model dropping one entity at a time. Identifies whether any single unit drives the result.
 
 ### When checks fail
 
@@ -650,28 +854,60 @@ method chain from Stage 3 → Stage 6]
 policy-eval/
 ├── SKILL.md
 ├── scripts/
-│   ├── stage3_analyze.py        # Deterministic method recommendation (Stage 3)
-│   ├── clean_panel.py           # Merge and clean
-│   ├── run_did.py               # Standard DID
-│   ├── run_staggered_did.py     # Staggered DID (C&S / S&A / BJS)
-│   ├── run_event_study.py       # Event study
-│   ├── run_scm.py               # Synthetic control
-│   ├── run_rdd.py               # Regression discontinuity
-│   ├── run_iv.py                # Instrumental variables
-│   ├── placebo_test.py          # Placebo permutation test
-│   ├── bacon_decomp.py          # Goodman-Bacon decomposition
-│   └── output_report.py         # Generate final report
+│   ├── run_pipeline.py            # Pipeline orchestrator (chain all stages)
+│   ├── stage3_analyze.py          # Deterministic method recommendation (Stage 3)
+│   ├── validate_data.py           # Data validation and quality checks (Stage 5→6)
+│   ├── fetch_data.py              # Tier A data fetch (pre-written, not ad-hoc)
+│   ├── clean_panel.py             # Merge and clean
+│   ├── run_did.py                 # Standard DID
+│   ├── run_staggered_did.py       # Staggered DID — doubly-robust C&S / S&A
+│   ├── run_event_study.py         # Event study
+│   ├── run_scm.py                 # Traditional synthetic control
+│   ├── run_synthetic_did.py       # Synthetic DID (Arkhangelsky et al. 2021)
+│   ├── run_rdd.py                 # Regression discontinuity
+│   ├── run_iv.py                  # Instrumental variables (2SLS / LIML)
+│   ├── placebo_test.py            # Placebo permutation test
+│   ├── bacon_decomp.py            # Goodman-Bacon decomposition
+│   ├── sensitivity_analysis.py    # Oster bounds, Rosenbaum, coefficient stability
+│   ├── run_dml.py                 # Double/Debiased Machine Learning
+│   ├── run_causal_forest.py       # Causal Forest for heterogeneity analysis
+│   └── output_report.py           # Generate final report
 ├── references/
-│   ├── data_sources.md          # Known data sources and access methods
-│   └── method_guide.md          # When to use each method
+│   ├── data_sources.md            # Known data sources and access methods
+│   ├── variable_map.json          # Stage 4→5 bridge: variable → fetch function
+│   └── method_guide.md            # When to use each method
 ├── assets/
 │   └── data_request_template.xlsx
 └── data/
-    ├── auto/                    # Auto-fetched data
-    ├── manual/                  # User-filled templates
-    ├── raw/                     # Raw files user drops in
-    └── merged/                  # Final analysis-ready data
+    ├── auto/                      # Auto-fetched data + stage outputs
+    ├── manual/                    # User-filled templates
+    ├── raw/                       # Raw files user drops in
+    └── merged/                    # Final analysis-ready data
 ```
+
+## Pipeline orchestration
+
+Use `run_pipeline.py` to chain stages automatically:
+
+```bash
+# Start a new pipeline (runs Stage 3 automatically, prompts for interactive stages)
+python scripts/run_pipeline.py --policy "LTCI Pilot" --outcome "Fertility Rate" \
+    --state my_analysis.json
+
+# Resume from a specific stage after completing interactive phases
+python scripts/run_pipeline.py --state my_analysis.json --from-stage 7 \
+    --data data/merged/panel.dta
+
+# Preview what will be run (dry run)
+python scripts/run_pipeline.py --policy "LTCI Pilot" --outcome "Fertility Rate" --dry-run
+
+# Check pipeline status
+python scripts/run_pipeline.py --state my_analysis.json --status
+```
+
+Stages 1-2 (problem definition and policy research) and Stages 4-6 (data requirements, acquisition, and method confirmation) require user interaction. Stages 3, 7, 8, and 9 run automatically when their inputs are available.
+
+The pipeline maintains a JSON state file tracking which stages are completed and what outputs each stage produced. This enables restartability — if a stage fails, fix the input and resume from that stage.
 
 ---
 

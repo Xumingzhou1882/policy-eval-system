@@ -1,12 +1,14 @@
 # Data Source Reference
 
-This guide lists common data sources for policy evaluation. Data acquisition is **project-specific**: the LLM writes fetch code on-the-fly for each project using the appropriate API package. No fixed fetch scripts — each source has different APIs, different variable names, different quirks.
+This guide lists common data sources for policy evaluation. Tier A sources have pre-written, tested fetch functions in `scripts/fetch_data.py`. The LLM does NOT write ad-hoc fetch code — it looks up variables in `references/variable_map.json` and calls the corresponding function.
 
-**Note**: The sources listed below are China-focused examples. For policy evaluations in other countries or domains (trade, environment, health, education, etc.), the LLM will identify and query the relevant data sources — World Bank ICIO for trade, EPA/DES inventory for emissions, IPUMS/DHS for health, etc. This list is a starting point, not a constraint.
+For sources or variables not yet in the variable map, the LLM can either extend `fetch_data.py` with a new function, or escalate to Tier B/C.
 
-## Tier A — Public APIs (LLM writes fetch code on-the-fly)
+**Note**: The sources listed below are China-focused examples. For policy evaluations in other countries or domains (trade, environment, health, education, etc.), add new entries to `variable_map.json` with the appropriate World Bank indicator codes or local API packages. This list is a starting point, not a constraint.
 
-| Source | Coverage | Common variables | Access | Python package |
+## Tier A — Public APIs (use fetch_data.py)
+
+| Source | Coverage | Common variables | Access | Module |
 |---|---|---|---|---|
 | World Bank API | 1960–present, 200+ countries | GDP, fertility (TFR), population, trade, CO2 | Free, no key | `wbgapi` or `requests` |
 | akshare | China city/province/national | GDP, population, CPI, PPI, fiscal revenue, housing | Free, no key | `akshare` |

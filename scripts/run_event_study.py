@@ -49,22 +49,29 @@ def build_relative_time(df: pd.DataFrame, entity_col: str, time_col: str,
     # Cap at edges to avoid small-sample bins
     df["_rel_time_w"] = df["_rel_time"].clip(-n_pre, n_post)
 
-    # Create dummy variables
+    # Create dummy variables (use _rel_nX for negative t to avoid patsy parse errors)
     for t in range(-n_pre, n_post + 1):
         if t == reference:
             continue
-        df[f"_rel_{t}"] = (df["_rel_time_w"] == t).astype(int)
+        label = f"_rel_n{abs(t)}" if t < 0 else f"_rel_{t}"
+        df[label] = (df["_rel_time_w"] == t).astype(int)
 
     return df
 
 
+def _rel_label(t: int) -> str:
+    """Column name for relative-time dummy. Uses _rel_nX for negative t."""
+    return f"_rel_n{abs(t)}" if t < 0 else f"_rel_{t}"
+
+
 def run_event_study(df: pd.DataFrame, outcome: str, entity_col: str, time_col: str,
-                    n_pre: int, n_post: int, reference: int, controls: list[str]) -> dict:
+                    first_treated_col: str, n_pre: int, n_post: int,
+                    reference: int, controls: list[str]) -> dict:
     """Estimate event-study coefficients and test pre-trends."""
 
     # Build dummies
-    rel_dummies = [f"_rel_{t}" for t in range(-n_pre, n_post + 1) if t != reference]
-    df = build_relative_time(df, entity_col, time_col, "first_treated",
+    rel_dummies = [_rel_label(t) for t in range(-n_pre, n_post + 1) if t != reference]
+    df = build_relative_time(df, entity_col, time_col, first_treated_col,
                              n_pre, n_post, reference)
 
     control_part = " + ".join(controls) if controls else ""
@@ -82,7 +89,7 @@ def run_event_study(df: pd.DataFrame, outcome: str, entity_col: str, time_col: s
         if t == reference:
             coefs[t] = {"coefficient": 0.0, "std_error": 0.0, "p_value": 1.0}
         else:
-            key = f"_rel_{t}"
+            key = _rel_label(t)
             if key in results.params:
                 coefs[t] = {
                     "coefficient": float(results.params[key]),
@@ -91,7 +98,7 @@ def run_event_study(df: pd.DataFrame, outcome: str, entity_col: str, time_col: s
                 }
 
     # Test joint significance of pre-treatment coefficients
-    pre_dummies = [f"_rel_{t}" for t in range(-n_pre, 0) if t != reference]
+    pre_dummies = [_rel_label(t) for t in range(-n_pre, 0) if t != reference]
     pre_dummies_found = [d for d in pre_dummies if d in results.params.index]
 
     pre_trends_result = {"jointly_zero": None, "f_stat": None, "p_value": None}
@@ -172,7 +179,8 @@ def main():
 
     df = load_data(args.data)
     result = run_event_study(df, args.outcome, args.entity, args.time,
-                             args.n_pre, args.n_post, args.reference, args.controls)
+                             args.first_treated, args.n_pre, args.n_post,
+                             args.reference, args.controls)
 
     print("\n──── Event Study ────")
     print(f"N obs: {result['n_obs']}")

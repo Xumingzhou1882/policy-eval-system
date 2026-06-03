@@ -110,9 +110,27 @@ This guide mirrors the deterministic decision tree in `stage3_analyze.py`. Start
 
 ---
 
-### Synthetic Control Method (SCM)
+### Synthetic Difference-in-Differences (Synthetic DID)
 
-**When**: Few treated units, many untreated units, no valid instrument, time-varying unobservables present.
+**When**: No untreated control group but many untreated donor units exist; panel data available; want valid standard errors and p-values.
+
+**What it does**: Finds optimal unit weights for donor pool that match pre-treatment outcomes, then applies DID differencing. Combines SCM-style weighting with DID-style time differencing to produce valid inference.
+
+**Key assumption**: Good pre-treatment fit; synthetic counterfactual captures time-varying confounders.
+
+**Test**: Pre-treatment RMSE; placebo-based inference (apply Synthetic DID to each donor unit → null distribution).
+
+**When it fails**: Poor pre-treatment fit → traditional SCM or interactive fixed effects.
+
+**Script**: `run_synthetic_did.py`
+
+**Literature**: Arkhangelsky, Athey, Hirshberg, Imbens & Wager (2021), "Synthetic Difference-in-Differences." AER.
+
+---
+
+### Traditional Synthetic Control Method (SCM)
+
+**When**: Few treated units, many untreated units, no valid instrument, time-varying unobservables present. Use when Synthetic DID placebo inference is unstable.
 
 **What it does**: Constructs a weighted combination of untreated donor units to create a counterfactual that matches the treated unit's pre-treatment trajectory.
 
@@ -137,6 +155,46 @@ This guide mirrors the deterministic decision tree in `stage3_analyze.py`. Start
 **When it fails**: Endogenous intensity → IV with an instrument for intensity.
 
 **Script**: (use panel regression with continuous treatment interaction)
+
+---
+
+### Double/Debiased Machine Learning (DML)
+
+**When**: Selection on observables with many controls (>15-20), or when the functional form of confounding is unknown. Modern upgrade over PSM/IPW.
+
+**What it does**: Uses flexible ML models (RandomForest, GradientBoosting, Lasso) to estimate nuisance functions E[Y|X] and E[T|X], then constructs Neyman-orthogonal scores that debias the ML estimates. Cross-fitting prevents overfitting bias.
+
+**Key assumption**: Unconfoundedness (CIA) — all confounders are measured. ML can model them flexibly but cannot fix omitted variable bias.
+
+**Test**: CV R² of nuisance models (should both be > 0.1); check for extreme propensity scores.
+
+**When it fails**: Very poor overlap → try trimming or AIPW. Missing confounders → no method fixes this; use Oster bounds (sensitivity_analysis.py).
+
+**Script**: `run_dml.py --ml-model gradient_boosting --cv 5`
+
+**Literature**: Chernozhukov et al. (2018), "Double/Debiased Machine Learning for Treatment and Structural Parameters." Econometrics Journal.
+
+---
+
+### Causal Forest (Generalized Random Forest)
+
+**When**: Treatment effect heterogeneity is of substantive interest — "who benefits most from the policy?" Not a primary identification strategy but a complement to any method.
+
+**What it does**: Honest random forest that estimates CATE for each unit. Uses sample splitting: one half for tree structure, the other for leaf estimates. Provides valid confidence intervals for individual-level CATE.
+
+**Key outputs**:
+- CATE distribution (mean, SD, quantiles, share positive/negative)
+- Variable importance (which features drive heterogeneity)
+- Best Linear Projection (which variables systematically predict CATE)
+- Quantile comparison (characteristics of most- vs. least-affected units)
+
+**Key assumption**: Unconfoundedness + overlap (same as DML). The causal forest inherits the identification assumptions of the underlying method.
+
+**When it fails**: Very small sample (< 500) → trees won't split enough for useful heterogeneity. Very few features → limited heterogeneity to discover.
+
+**Script**: `run_causal_forest.py --num-trees 2000 --features x1 x2 x3`
+
+**Literature**: Wager & Athey (2018), "Estimation and Inference of Heterogeneous Treatment Effects using Random Forests." JASA. Athey, Tibshirani & Wager (2019), "Generalized Random Forests." Annals of Statistics.
 
 ---
 
