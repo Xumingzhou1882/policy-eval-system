@@ -194,6 +194,9 @@ def compute_dr_att(df: pd.DataFrame, outcome: str, entity_col: str,
         ctrl_sub["_ipw_norm"] = ctrl_sub["_ipw_weight"] * n_ctrl / ipw_sum
     else:
         ctrl_sub["_ipw_norm"] = 1.0
+    # Copy _ipw_norm back to sub so downstream indexing works
+    sub["_ipw_norm"] = 1.0
+    sub.loc[ctrl_sub.index, "_ipw_norm"] = ctrl_sub["_ipw_norm"]
 
     treat_residual = treat_sub["_delta_y"].values - treat_sub["_m_hat"].values
     ctrl_residual = ctrl_sub["_delta_y"].values - ctrl_sub["_m_hat"].values
@@ -365,7 +368,7 @@ def callaway_santanna(df: pd.DataFrame, outcome: str, entity_col: str,
             "n_periods": len(g_estimates),
             "n_units": int(len(treat_ids)),
             "t_stat": float(g_att / g_se) if g_se > 0 else 0,
-            "p_value": float(2 * (1 - _normal_cdf(abs(g_att / g_se)))) if g_se > 0 else 1.0,
+            "p_value": max(float(2 * (1 - _normal_cdf(abs(g_att / g_se)))), 1e-300) if g_se > 0 else 1.0,
         }
 
     # Overall ATT: weighted by cohort size (precision weighting)
@@ -395,24 +398,42 @@ def callaway_santanna(df: pd.DataFrame, outcome: str, entity_col: str,
             avg_att = np.mean([e["att"] for e in rel_estimates])
             # Use min of SEs (optimistic) and pooled SE
             pooled_se = np.sqrt(np.mean([e["std_error"] ** 2 for e in rel_estimates]))
+            t_stat = abs(avg_att / pooled_se) if pooled_se > 0 else 0
+            p_val = float(2 * (1 - _normal_cdf(t_stat))) if pooled_se > 0 else 1.0
             event_study[rel_time] = {
                 "att": float(avg_att),
                 "std_error": float(pooled_se),
                 "n_estimates": len(rel_estimates),
+                "p_value": max(p_val, 1e-300),  # guard against float underflow to 0.0
             }
+
+    overall_t_stat_val = overall_att / overall_se if overall_se and overall_se > 0 else None
+    overall_p_val = max(float(2 * (1 - _normal_cdf(abs(overall_t_stat_val)))), 1e-300) if overall_t_stat_val is not None else None
+
+    n_treat_entities = int(treated[entity_col].nunique())
+    n_all_entities = int(df[entity_col].nunique())
+    n_obs = int(len(df))
+    n_periods = int(df[time_col].nunique())
 
     return {
         "method": f"Callaway & Sant'Anna (2021) doubly-robust — {control_label}",
+        "outcome": outcome,
         "control_type": control_type,
         "atts": {f"{g},{t}": v for (g, t), v in atts.items()},
         "cohort_atts": cohort_atts,
         "overall_att": overall_att,
         "overall_se": overall_se,
-        "overall_t_stat": overall_att / overall_se if overall_se and overall_se > 0 else None,
+        "overall_p_value": overall_p_val,
+        "overall_t_stat": overall_t_stat_val,
         "event_study": {str(k): v for k, v in event_study.items()},
         "n_cohorts": len(cohorts),
-        "n_total_periods": len(time_range),
+        "n_total_periods": n_periods,
         "n_control_units": int(len(control_ids)),
+        "n_treated_units": n_treat_entities,
+        "n_entities": n_all_entities,
+        "n_obs": n_obs,
+        "n_periods": n_periods,
+        "controls": covariates,
     }
 
 
@@ -512,7 +533,8 @@ def sun_abraham(df: pd.DataFrame, outcome: str, entity_col: str,
 # ═══════════════════════════════════════════════════════════════════════
 
 def _normal_cdf(x: float) -> float:
-    return 0.5 * (1 + np.erf(x / np.sqrt(2)))
+    import math
+    return 0.5 * (1 + math.erf(x / math.sqrt(2)))
 
 
 def _sig(p: float) -> str:

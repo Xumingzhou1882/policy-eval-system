@@ -196,6 +196,130 @@ Format each question with:
 
 ---
 
+### Narrative sections output (required before Stage 9)
+
+After the structured facts JSON, the LLM MUST also produce `data/auto/stage2_sections.json` containing narrative prose for the final academic report. These sections are independent of method choice — they describe the policy context and economic logic, which applies regardless of which estimator is used.
+
+**CRITICAL: These sections are the primary content for the final report's 引言 and 制度背景与理论分析 chapters. Each section MUST be 400-800 Chinese characters of substantive, publication-quality prose. Short placeholder text is unacceptable.** The content written here directly determines the quality of the final academic paper. Write as if drafting a real journal submission.
+
+#### Section 1: `intro_background` (研究背景, 400-600字)
+
+This section opens the paper. Structure it as THREE paragraphs:
+
+**Paragraph 1 — Problem setting (150-200字):**
+- Open with a striking data point, policy announcement event, or social problem fact. Use a specific number, date, or quote.
+- Describe the socioeconomic context that motivated the policy.
+- State what problem the policy was designed to solve.
+
+**Paragraph 2 — Policy introduction (100-150字):**
+- Name the policy, its issuance date, issuing authority, and basic mechanism.
+- State its geographic scope and rollout pattern (unified vs. staggered).
+- Mention who is covered and what the intervention consists of.
+
+**Paragraph 3 — Research motivation (150-250字):**
+- Why is causal evaluation of this policy important? (Academic debate? Policy uncertainty? Scale of expenditure?)
+- What is the research question in one clear sentence.
+- Preview the paper's approach without naming the specific method (e.g., "利用政策分批推广的准自然实验变异" not "采用Callaway & Sant'Anna (2021) staggered DID").
+
+Example of good opening: "2016年6月，人力资源和社会保障部发布《关于开展长期护理保险制度试点的指导意见》（人社厅发〔2016〕xx号），选定15个城市启动长期护理保险首批试点。截至2020年第二批试点扩面，全国共有49个城市参与。这一政策覆盖约1.2亿参保人群，年度基金支出规模超过100亿元，是'十三五'期间中国社会保障领域最重要的制度创新之一。"
+
+#### Section 2: `intro_literature` (文献综述, 400-600字)
+
+**Paragraph 1 — Related literature (200-250字):**
+- Cite 4-6 real papers with author surnames and years. Group them thematically (not one-by-one).
+- Include BOTH: (a) papers studying this specific policy or similar policies in other countries, AND (b) methodological papers relevant to the identification challenge.
+- For each paper or group, mention: what they studied, what method they used, key finding.
+- DO NOT invent papers. Use papers discovered during web searches in Stage 2.
+
+**Paragraph 2 — Gap identification (100-150字):**
+- What do existing studies miss? Common gaps: limited data (short panels, few cities), weak identification (no control group, no staggered timing), narrow outcomes, lack of robustness checks.
+- Be specific about which gap YOUR study fills. Don't say "there are few studies" — say "existing studies on this policy use provincial-level data and cannot exploit city-level variation in treatment timing."
+
+**Paragraph 3 — Contribution (100-200字):**
+- State 2-3 concrete marginal contributions. Use numbered points.
+- Contributions should cover: data (broader coverage, longer panel), method (exploiting specific policy design feature), and substance (new outcome variable, new channel).
+
+Example: "已有文献主要使用省级面板数据评估该政策效果（Zhang, 2020; Li & Wang, 2021），无法利用城市层面的受处理时间变异..."
+
+#### Section 3: `institution` (制度背景, 500-800字)
+
+This is the LONGEST and MOST DETAILED section. It provides the institutional knowledge that justifies the identification strategy.
+
+**Paragraph 1 — Policy origins and legal basis (100-150字):**
+- Issuing authority, key document numbers, legislative/regulatory basis.
+- Policy objectives as stated in official documents.
+
+**Paragraph 2 — Rollout timeline and geography (200-300字):**
+- List EACH batch: year, number of cities, selection criterion (if known).
+- List at least 8-10 pilot city names grouped by batch.
+- Mention any voluntary opt-in or mandatory participation features.
+- INCLUDE a table-like structure in prose: "第一批（2016年）：青岛市、上海市、...等15个城市；第二批（2020年）：北京市、天津市、...等14个城市。"
+
+**Paragraph 3 — Policy design features relevant to identification (150-200字):**
+- Is treatment binary or continuous? Same for all treated units?
+- Are there never-treated units? Why were they not selected?
+- Was assignment based on observable characteristics? Which ones?
+- Any threshold rules or eligibility criteria?
+
+**Paragraph 4 — Concurrent policies and caveats (100-150字):**
+- List other policies affecting the same outcome during the same period.
+- Discuss whether they are separable (by region, timing, or data).
+
+#### Section 4: `theory` (理论机制, 400-600字)
+
+**Paragraph 1 — Channel framework (150-200字):**
+- State 2-3 competing channels through which the policy could affect the outcome.
+- Label each channel clearly (e.g., "收入效应", "替代效应", "一般均衡效应").
+- For EACH channel: explain the logic chain linking policy → intermediate variable → outcome.
+
+**Paragraph 2 — Channel analysis (150-200字):**
+- For each channel, discuss its expected direction and magnitude.
+- Cite established economic theory or prior empirical work supporting each channel (e.g., "根据Becker (1965)的家庭生产模型...").
+- State whether channels reinforce or offset each other.
+
+**Paragraph 3 — Net prediction (100-200字):**
+- Is the net effect theoretically determinate or ambiguous?
+- If ambiguous: state that the empirical analysis will resolve the direction.
+- If determinate: state the predicted sign and explain why one channel is expected to dominate.
+
+#### Quality checklist (verify BEFORE writing the JSON file)
+
+Before saving `data/auto/stage2_sections.json`, verify:
+
+```
+[ ] intro_background: Opens with a concrete number/fact/event?    □
+[ ] intro_background: States the research question explicitly?    □
+[ ] intro_literature: Cites 4+ real papers with author+year?     □
+[ ] intro_literature: States 2+ specific contributions?           □
+[ ] institution: Lists specific policy document numbers?          □
+[ ] institution: Names 8+ pilot cities grouped by batch?          □
+[ ] institution: Discusses identification-relevant design?        □
+[ ] theory: Presents 2+ competing channels?                       □
+[ ] theory: Cites economic theory for each channel?               □
+[ ] ALL sections: 400+ Chinese characters (not just spaces)?      □
+```
+
+If any checkbox is unchecked, rewrite that section before saving. A section under 350 characters is a HARD FAIL — expand it with more specific details from the Stage 2 research findings.
+
+Save this file:
+```bash
+# The LLM writes this file after completing Stage 2 research
+# Path: data/auto/stage2_sections.json
+```
+
+The JSON schema:
+```json
+{
+  "intro_background": "段落1-3的完整文本，共400-600字",
+  "intro_literature": "段落1-3的完整文本，共400-600字",
+  "institution": "段落1-4的完整文本，共500-800字",
+  "theory": "段落1-3的完整文本，共400-600字"
+}
+```
+
+A fifth section `conclusion` is written AFTER Stage 7 estimation completes — the LLM generates it based on the actual results, with the pipeline state as context. The other four sections are written during Stage 2 and do not depend on estimation results.
+
+---
 ## Stage 3: Theoretical method analysis
 
 ### What this stage does
@@ -288,50 +412,120 @@ Do not proceed until the user confirms.
 
 ## Stage 4: Data requirements
 
-### What the system does
+### What this stage does
 
-Based on the theoretical method from Stage 3, produce a concrete data requirements checklist — what variables are needed, at what level, from what source, and whether each is essential or optional. Then **wait for the user to confirm** what they can provide before proceeding to data acquisition.
+Translates Stage 3's concept-level variable requirements (e.g., "outcome", "entity_id") into concrete variable_map.json keys with tier assignments and acquisition plans. Produces a structured JSON that Stage 5 can execute directly.
 
-### Output format
+### Running Stage 4
 
-Present data needs in structured tables, not prose. Distinguish **essential** (required by the identification strategy) from **optional** (improves precision or enables robustness checks).
+```bash
+# Auto-generate requirements by cross-referencing Stage 3 with variable_map.json
+python scripts/stage4_requirements.py --stage3 data/auto/stage3_result.json \
+    --output data/auto/stage4_requirements.json --text
+```
 
-#### Essential variables
+The script:
+1. Reads Stage 3's `required_variables` and `optional_variables` (concept-level names)
+2. Searches `variable_map.json` for matching entries by keyword, description, and concept hints
+3. Assigns tier (A/B/C) based on source type
+4. Flags unmatched variables that need manual handling
+5. Outputs `stage4_requirements.json` — a structured file listing every variable with its `matched_key`, `tier`, `source_label`, and `acquisition` plan
 
-| 变量 | 含义 | 层级 | 来源 |
-|---|---|---|---|
-| `outcome` | [What to measure] | [Individual? City-year?] | [Expected source] |
-| `entity_id` | [Unit identifier] | [Entity level] | [Expected source] |
-| `time` | [Time period] | [Year? Quarter?] | [Expected source] |
-| `first_treated` | [When each unit is first treated] | [Entity level] | Policy documents |
+### Output format (`stage4_requirements.json`)
 
-Add identification-specific requirements from Stage 3 (e.g., running variable for RDD, instrument for IV, never-treated indicator for staggered DID).
+```json
+{
+  "method": "Callaway & Sant'Anna (2021) staggered DID",
+  "mechanism": "staggered_policy_shock",
+  "entity_level": "city-year",
+  "time_unit": "year",
+  "variables": [
+    {
+      "concept": "outcome",
+      "description": "Fertility rate (births per woman)",
+      "essential": true,
+      "matched_key": "fertility_rate",
+      "tier": "B",
+      "source_label": "World Bank — 仅国家层面，城市层面需CFPS",
+      "acquisition": "manual",
+      "alternatives": [
+        {"key": "birth_rate", "description": "出生率", "score": 55}
+      ]
+    },
+    {
+      "concept": "gdp",
+      "description": "GDP per capita (current US$)",
+      "essential": true,
+      "matched_key": "gdp_per_capita",
+      "tier": "A",
+      "source_label": "世界银行API (World Bank)",
+      "acquisition": "auto",
+      "alternatives": []
+    }
+  ],
+  "unmatched": ["custom_policy_index"],
+  "summary": {
+    "total": 8, "essential": 5, "optional": 3,
+    "auto_fetch": 4, "manual_or_request": 3, "unmatched": 1
+  }
+}
+```
 
-#### Optional variables
+### What the LLM does in Stage 4
 
-| 变量 | 含义 | 层级 | 来源 |
-|---|---|---|---|
-| ... | ... | ... | ... |
+1. **Review auto-matches**: The script suggests variable_map keys. The LLM reviews each match for correctness — does `gdp_per_capita` from World Bank actually match the required "GDP at city level"? If not, flag it.
 
-#### Policy variables (from Stage 2)
+2. **Handle unmatched variables**: For variables the script couldn't match, the LLM must:
+   - Search `variable_map.json` manually for alternatives
+   - Determine if the variable is Tier A (available via a different key), Tier B (micro survey), Tier C (manual collection), or Tier D (unavailable)
+   - Write a `--mappings` JSON file with the correct key and source for each unmatched variable, then re-run `stage4_requirements.py --mappings mappings.json`
 
-List policy data already collected (pilot city names, dates, batch info).
+3. **Present gaps to the user**: For Tier B/C/D variables, tell the user exactly what they need to provide. Only ask about genuinely ambiguous choices.
+
+4. **Save the final requirements**: The completed `stage4_requirements.json` is the single source of truth that Stage 5 reads.
+
+### User mappings format (`--mappings`)
+
+When the auto-match is wrong or a variable isn't matched, the LLM writes a mappings JSON:
+
+```json
+{
+  "outcome": {
+    "key": "city_birth_rate",
+    "description": "城市层面出生率 — 需从统计年鉴手动收集",
+    "tier": "C",
+    "source": "中国城市统计年鉴 2015-2020"
+  },
+  "running_variable": {
+    "key": "vehicle_range_km",
+    "description": "新能源车续航里程",
+    "tier": "B",
+    "source": "工信部新能源汽车推广应用推荐车型目录"
+  }
+}
+```
+
+Then re-run:
+```bash
+python scripts/stage4_requirements.py --stage3 data/auto/stage3_result.json \
+    --mappings data/auto/stage4_mappings.json --output data/auto/stage4_requirements.json
+```
 
 ### Confirmation step
 
-After presenting the checklist, explicitly ask the user:
+After presenting the final requirements table, ask the user:
 
 ```
-Which of these data sources do you have access to?
-A. [Source 1] — I can provide this
-B. [Source 2] — I can provide this
-C. [Source 3] — not available
+Stage 4 complete. Summary:
+  - {N} variables auto-matched (Tier A) → Stage 5 will fetch automatically
+  - {M} variables need manual handling (Tier B/C)
+  - {K} variables unmatched
 
-If Tier B/C data is available: "Place the files in data/raw/ and say 'data is ready'."
-If Tier A: "I will auto-fetch this in Stage 5."
+For Tier B/C data: "Place the files in data/raw/ and the pipeline will pick them up."
+Proceed to Stage 5?
 ```
 
-**Do not proceed to Stage 5 until the user confirms what data is available.** Gaps identified here drive the data acquisition plan.
+**Do not proceed to Stage 5 until the user confirms.** Gaps identified here drive the data acquisition plan.
 
 ---
 
@@ -511,18 +705,57 @@ Pre-fill rules:
 ### Pipeline state tracking
 
 The pipeline state JSON (`--state` in `run_pipeline.py`) tracks each variable's
-acquisition status in `stages.stage5.data_status`:
+acquisition status in `stages.stage5.data_status`.
+
+**IMPORTANT: After calling `fetch_from_variable_map()`, always convert results with `results_to_data_status()` to auto-populate source metadata.** This function reads `description`, `source`, and `tier` from each `FetchResult` (which pulls them from `variable_map.json`) — no manual guessing required:
+
+```python
+from fetch_data import fetch_from_variable_map, results_to_data_status
+
+results = fetch_from_variable_map(["gdp", "population", "fertility_rate"])
+data_status = results_to_data_status(results)
+# Then write data_status into the pipeline state JSON under stages.stage5.data_status
+```
+
+Each entry in `data_status` MUST include all fields below:
 
 ```json
 {
   "stages": {
     "stage5": {
       "data_status": {
-        "gdp":              {"tier": "A", "status": "fetched",  "path": "data/auto/gdp.json"},
-        "population":       {"tier": "A", "status": "fetched",  "path": "data/auto/population.json"},
-        "fertility_rate":   {"tier": "B", "status": "requested","path": null},
-        "pilot_city_list":  {"tier": "C", "status": "pending",  "path": "data/manual/pilot_cities.xlsx"},
-        "education_level":  {"tier": "D", "status": "unavailable", "path": null}
+        "gdp": {
+          "tier": "A",
+          "status": "fetched",
+          "description": "GDP per capita (current US$)",
+          "source": "世界银行API (World Bank)",
+          "path": "data/auto/gdp.json"
+        },
+        "population": {
+          "tier": "A",
+          "status": "fetched",
+          "description": "Total population",
+          "source": "世界银行API (World Bank)",
+          "path": "data/auto/population.json"
+        },
+        "fertility_rate": {
+          "tier": "B",
+          "status": "requested",
+          "description": "Fertility rate (births per woman)",
+          "source": "CFPS 2020 wave (需申请)",
+          "path": null
+        },
+        "pilot_city_list": {
+          "tier": "C",
+          "status": "pending",
+          "description": "长期护理保险试点城市名单",
+          "source": "人社厅发〔2016〕xx号 + 医保发〔2020〕xx号",
+          "path": "data/manual/pilot_cities.xlsx"
+        }
+      }
+    }
+  }
+}
       }
     }
   }
@@ -538,6 +771,11 @@ This enables:
 
 ### Key principle
 
+Stage 5 reads `stage4_requirements.json` to know what to fetch. For each variable:
+- `acquisition: "auto"` → call `fetch_from_variable_map()` with the `matched_key`
+- `acquisition: "manual"` → follow Tier B/C templates (application instructions or Excel templates)
+- After fetching, call `results_to_data_status(results)` to auto-populate source metadata — every variable gets `description`, `source`, `tier` from `variable_map.json`, no manual guessing.
+
 Tier A uses pre-written `fetch_data.py` functions — no ad-hoc code. Tier B/C
 follow fixed templates so the data contract between stages is predictable.
 The pipeline state file is the single source of truth for what data exists,
@@ -551,114 +789,129 @@ Wait for the user to say "data is ready" before proceeding to Stage 6.
 
 ### What this stage does
 
-**This is where theory meets reality.** With actual data in hand, verify whether the theoretical method from Stage 3 is feasible. If not, fall back to the pre-registered alternatives — and document the compromise.
+**This is where theory meets reality.** The system automatically verifies every testable identifying assumption from Stage 3 against the actual data. If the primary method's assumptions fail, it walks the pre-registered fallback chain from Stage 3 in ranked order — and every decision is traceable.
 
-This stage has two possible outcomes:
+Stage 6 is automated via `scripts/stage6_confirm.py`. It is **deterministic**: same Stage 3 output + same data always produces the same confirmation.
 
-```
-Outcome A: Data supports the theoretical method   → Proceed as planned
-Outcome B: Data contradicts an assumption          → Switch to fallback, document why
-```
+### Running Stage 6
 
-### Step 1: Verify theoretical method against actual data
+```bash
+# From a pipeline state file (recommended)
+python scripts/run_pipeline.py --state my_analysis.json --from-stage 6 --data data/merged/panel.dta
 
-For each key identifying assumption from Stage 3, check against the real data:
+# Standalone
+python scripts/stage6_confirm.py --stage3 data/auto/stage3_result.json \
+    --data data/merged/panel.dta --output data/auto/stage6_confirmation.json
 
-```
-Assumption verification:
-├── [Assumption 1]: [How to test / How to argue]
-│   ├── Data check: [Specific test result or data characteristic]
-│   ├── Verdict: ✓ Holds / ✗ Violated / ? Cannot verify
-│   └── If violated: Is there a fallback that relaxes this assumption?
-├── [Assumption 2]: [How to test / How to argue]
-│   ...
-└── [Assumption 3]: ...
+# With cached validation report
+python scripts/stage6_confirm.py --stage3 data/auto/stage3_result.json \
+    --data data/merged/panel.dta \
+    --validate-report data/auto/validation_report.json \
+    --output data/auto/stage6_confirmation.json
 ```
 
-For DID-family methods, pay special attention to:
+### How it works
 
-- **Parallel pre-trends**: Generate an event study plot. Test whether pre-treatment coefficients are jointly zero. If pre-treatment trends diverge, DID is not valid — switch to the fallback.
-- **Staggered DID negative weights**: Run Goodman-Bacon decomposition. If the negative weight share exceeds 10%, TWFE is unreliable — switch to C&S / S&A / BJS.
-- **No-anticipation**: Are there effects in t-1? If yes, units may have adjusted before the policy — flag as a caveat.
-- **Treatment variation**: Is there sufficient within-unit treatment variation? If treatment is near-constant (e.g., one batch covers 90% of units), staggered DID has low power.
+1. **Reads Stage 3 output**: extracts the primary method, all identifying assumptions, and ranked fallbacks.
+2. **Runs data validation**: calls `validate_data.py` (or loads a cached report) to check panel structure, missing values, outliers, and treatment consistency.
+3. **Dispatches diagnostics**: for each testable assumption, runs the appropriate test (see mapping below). For non-testable assumptions (SUTVA, exclusion restriction, unconfoundedness), marks them as UNCERTAIN — these require human judgment.
+4. **Evaluates results**: each assumption gets PASS / FAIL / UNCERTAIN.
+5. **If FAIL exists**: walks the fallback chain from Stage 3 in ranked order. For each fallback, checks data availability, runs its own diagnostics, and selects the first fallback that passes.
+6. **Produces structured output**: `stage6_confirmation.json` with assumption verdicts, final method decision, specification for Stage 7, and causal claim strength.
 
-For RDD:
+### Diagnostic coverage by mechanism
 
-- **McCrary test**: Is there a discontinuity in the density of the running variable at the cutoff? If yes, manipulation is suspected — use donut-hole RDD or switch to DID.
-- **Baseline covariate balance at cutoff**: Are pre-treatment covariates smooth across the cutoff? If not, the RDD design is suspect.
-- **First-stage strength (fuzzy RDD)**: Is the jump in treatment probability at the cutoff statistically significant? If the F-statistic < 10, the instrument is weak.
+| Mechanism | Testable assumptions | Diagnostic |
+|---|---|---|
+| staggered_policy_shock | Parallel trends, No anticipation | Event study F-test + t-1 coefficient |
+| staggered_policy_shock | Limited heterogeneity / Negative weights | Goodman-Bacon decomposition |
+| single_policy_shock | Parallel trends, No anticipation | Event study F-test + t-1 coefficient |
+| single_policy_shock | Stable unit composition | Panel balance check |
+| threshold_rule | No manipulation of running variable | McCrary (2008) density test |
+| threshold_rule | Continuity of potential outcomes | Covariate balance at cutoff |
+| threshold_rule | First-stage strength (fuzzy RDD) | F-statistic at cutoff |
+| time_varying_unobservables | Relevance (IV path) | Montiel Olea & Pflueger effective F |
+| time_varying_unobservables | Pre-treatment fit (SCM path) | Pre-treatment RMSE |
+| time_varying_unobservables | No post-treatment confounders | In-space placebo |
+| selection_on_observables | Overlap / positivity | Propensity score support |
+| selection_on_observables | ML model quality (DML) | Nuisance model CV R² |
+| continuous_intensity | Parallel trends in dose-response | Dose-response event study |
+| multiple_overlapping_policies | Group exclusivity | Policy exposure overlap check |
+| random_assignment | Attrition, Compliance | Attrition rate comparison, compliance rate |
 
-For IV:
+Non-testable assumptions (SUTVA, exclusion restriction, unconfoundedness/CIA, monotonicity, no policy interactions, exogenous intensity, never-treated validity) are always UNCERTAIN — they must be argued from institutional knowledge in Stage 9.
 
-- **First-stage F-statistic**: Montiel Olea & Pflueger (2013) effective F-statistic. If below the critical value, the instrument is weak — use LIML or switch strategy.
-- **Overidentification test** (if multiple instruments): Hansen J-test. Rejection means at least one instrument is invalid.
+### Output format (`stage6_confirmation.json`)
 
-For SCM:
-
-- **Pre-treatment RMSE**: Is the synthetic control closely tracking the treated unit before treatment? If fit is poor, SCM is unreliable — consider interactive fixed effects instead.
-- **Donor pool adequacy**: Are there enough untreated units with similar characteristics? If not, SCM extrapolates too far.
-- **In-space placebo**: Does the effect for the treated unit stand out when you apply SCM to each donor unit?
-
-### Step 2: Make the final decision
-
-```
-Can the theoretical method be applied to this data?
-├── YES → Use the theoretical method.
-│   Document that all testable assumptions hold.
-│
-└── NO → Which assumption fails?
-    ├── Assumption is testable and clearly violated
-    │   → Switch to the pre-registered fallback from Stage 3.
-    │   → Record what was violated and why the fallback is valid.
-    │
-    ├── Data is missing a required variable
-    │   → Return to Stage 5, request the missing data.
-    │
-    └── No fallback available
-        → Best feasible method given constraints.
-        → Downgrade causal claim strength.
-        → Flag as a major limitation in Stage 9.
-```
-
-### Final method confirmation report
-
-```
-═══════════════════════════════════
-Final Method Confirmation
-═══════════════════════════════════
-
-Theoretical method (Stage 3): [Method A]
-Final method (Stage 6): [Method B]
-
-[If A = B]:
-All testable assumptions of [Method A] are supported by the data. Proceeding with
-the theoretically preferred specification.
-
-[If A ≠ B]:
-[Method A] was theoretically preferred, but the data revealed that:
-├── [Specific assumption violation or data limitation]
-├── [Why this matters for identification]
-└── Therefore switching to [Method B], which:
-    ├── [Relaxes assumption X]
-    ├── [Requires assumption Y instead — is this plausible?]
-    └── [Implication for causal claim strength: weaker / different interpretation]
-
-Key specification details:
-├── Model: [e.g., Callaway & Sant'Anna (2021) group-time ATT, never-treated control]
-├── Outcome transformation: [e.g., log, IHS, none]
-├── Fixed effects: [Entity, Time, both, or neither]
-├── Standard errors: [e.g., Clustered at city level, wild bootstrap]
-└── Covariates: [List of controls included in the main specification]
-
-Known limitations (to be surfaced in Stage 9):
-├── [Limitation 1]
-└── [Limitation 2]
-
-Do you approve the final method?
-═══════════════════════════════════
+```json
+{
+  "mechanism": "staggered_policy_shock",
+  "theoretical_method": "Callaway & Sant'Anna (2021) — never-treated as control",
+  "final_method": "Callaway & Sant'Anna (2021) — never-treated as control",
+  "method_changed": false,
+  "chain": ["Callaway & Sant'Anna (2021) — never-treated as control"],
+  "gap_explanation": "",
+  "assumption_verdicts": [
+    {
+      "assumption_name": "Parallel trends",
+      "description": "...",
+      "testable": true,
+      "test_method": "Event study: pre-treatment coefficients jointly zero (F-test).",
+      "diagnostic": {
+        "diagnostic_name": "event_study_parallel_trends",
+        "status": "PASS",
+        "values": {"f_stat": 1.23, "p_value": 0.31},
+        "threshold": "p_value > 0.05",
+        "interpretation": "Pre-trends F-test p=0.3104. Parallel trends supported."
+      },
+      "verdict": "PASS",
+      "reasoning": "Pre-trends F-test p=0.3104. Parallel trends supported."
+    }
+  ],
+  "fallback_attempts": [],
+  "data_quality_summary": {"overall": "PASS", "total_issues": 0, "critical_issues": []},
+  "specification": {
+    "entity_col": "city_id",
+    "time_col": "year",
+    "outcome": "log_fertility",
+    "first_treated_col": "first_treated",
+    "control_type": "never-treated",
+    "method": "cs",
+    "no_estimation_script": false
+  },
+  "warnings": [],
+  "limitations": [],
+  "causal_claim_strength": "strong"
+}
 ```
 
-Do not proceed until the user confirms.
+### Fallback chain logic
+
+When the primary method fails any diagnostic:
+
+1. Fallbacks are tried in the exact ranked order from Stage 3's `fallbacks` list.
+2. For each fallback: check if required data columns exist → run method-specific diagnostics → if all pass, select this fallback.
+3. If no fallback passes, keep the theoretical method but downgrade causal claim strength and flag major limitations.
+4. If a fallback has no estimation script (e.g., PSM, DDD), it is selected but marked `no_estimation_script: true` — Stage 7 will report this to the user.
+
+### Verdict semantics
+
+| Verdict | Meaning |
+|---|---|
+| PASS | The diagnostic confirms the assumption is supported by the data. |
+| FAIL | The diagnostic contradicts the assumption. A fallback is triggered if available. |
+| UNCERTAIN | The assumption cannot be tested with available data, or requires institutional knowledge. |
+
+### Causal claim strength
+
+| Rating | Conditions |
+|---|---|
+| strong | All testable assumptions pass, no method downgrade |
+| moderate | All pass but method was downgraded, or some UNCERTAIN |
+| suggestive | 1-2 failures after downgrade, or most assumptions UNCERTAIN |
+| not identifiable | Multiple failures with no viable fallback |
+
+If you disagree with a verdict, re-run with corrected data or manually override the `stage6` key in the pipeline state file before Stage 7.
 
 ---
 
@@ -756,6 +1009,8 @@ Synthetic DID (Arkhangelsky et al. 2021) combines SCM-style unit weighting with 
 
 ## Stage 8: Robustness checks
 
+**Note**: If Stage 6 confirmed a method that relies on unconfoundedness (CIA) — such as PSM, IPW, DML, or Causal Forest — the Oster bounds and coefficient stability checks below are especially important. CIA cannot be empirically tested; these sensitivity tests assess how strong unobservables would need to be to explain away the result.
+
 ### Automatic checks (run all, report which pass)
 
 | Check | What it tests | How |
@@ -810,41 +1065,132 @@ Don't just report failure. Explain:
 
 ## Stage 9: Result report
 
-### Output format
+### What this stage does
+
+Generates a comprehensive academic paper draft in three formats:
+1. **Structured JSON** (`report_data.json`) — machine-readable, all data extracted and normalized
+2. **Markdown** (`paper.md`) — pipe tables with section numbering, GitHub/VS Code preview, convertible to PDF/Word via pandoc
+3. **XeLaTeX** (`paper.tex`) — three-line `booktabs` tables with `siunitx` number alignment, `xeCJK` Chinese support, compiles directly to PDF
+
+The report follows standard academic paper structure: Abstract → Introduction → Institution & Theory → Research Design → Empirical Results → Robustness → Conclusion → References → Appendix.
+
+### Architecture
 
 ```
-═══════════════════════════════════
-Causal Inference Report
-═══════════════════════════════════
-
-Policy: [Policy name]
-Outcome: [Outcome name]
-Method chain: [Theoretical method (Stage 3)] → [Final method (Stage 6)]
-  [If they differ, explain the gap here in one sentence]
-Data: [Source, time span, N]
-
-─── Main Result ───
-The policy [increased/decreased/had no effect on] [outcome].
-Effect size: [X]%, p = [value] (significant at [level])
-
-─── Robustness ───
-[X/Y] robustness checks passed.
-[List each check and result, one line each]
-
-─── Key Assumption ───
-[Assumption]: [Did it hold? How do we know?]
-
-─── Limitations ───
-1. [Limitation — including any gap between theoretical and final method]
-2. [Limitation]
-
-─── Causal Claim Strength ───
-[Strong / Moderate / Suggestive]
-[One sentence justification, referencing assumption verification and the
-method chain from Stage 3 → Stage 6]
-
-═══════════════════════════════════
+output_report.py     →  report_data.json     (data extraction + rough auto-generation)
+       ↓
+LLM translation step  →  report_data.json    (⚠ CRITICAL: translate identification, abstract, conclusion
+       │                                        into natural Chinese academic prose)
+       ↓
+render_report.py     →  paper.md / paper.tex (rendering + optional PDF compilation)
 ```
+
+`output_report.py` handles all format differences between Stage 7 estimation scripts and produces a unified JSON. The auto-generated fields (`model_spec.identification`, abstract, conclusion) use raw Stage 3/6 data which contains English terminology.
+
+**The LLM MUST then read `report_data.json` and do the following:**
+
+**A. Complete incomplete references (do this FIRST):**
+
+References are stored in `data["references"]` as a list of dicts:
+```json
+{"text": "Full citation...", "complete": true}     // done
+{"text": "Author (Year)", "complete": false,
+ "search_query": "Author Year paper", "authors": "...", "year": "..."}  // needs web search
+```
+
+For every entry with `"complete": false`:
+1. Search the web using `search_query` (or construct a query like `"{authors} {year} paper title journal"`)
+2. Find the full citation: authors, title, journal, volume, pages, DOI if available
+3. Replace the entry with `{"text": "<full citation string>", "complete": true}`
+
+**B. Rewrite these fields into natural Chinese academic prose:**
+
+| Field | What to translate | Source |
+|---|---|---|
+| `model_spec.identification` | Method rationale, assumption names, mechanism labels, fallback descriptions | Stage 3 + Stage 6 |
+| `sections.conclusion` | Auto-generated conclusion paragraph | Stage 7 results |
+| `data_meta` → abstract fields | Abstract text (rendered live from main_result) | Stage 7 results |
+
+Translation guidelines:
+- **Method names**: Translate but keep the English reference in parentheses on first use. E.g., "交错型双重差分估计量（Callaway & Sant'Anna, 2021）"
+- **Assumption names**: Use standard Chinese econometrics terminology. E.g., "平行趋势假设" not "Parallel trends", "无预期效应" not "No anticipation"
+- **Mechanism labels**: Translate the concept, not the code. E.g., "政策分批推广形成的交错处理" not "staggered_policy_shock"
+- **Fallback descriptions**: Make them readable sentences, not key-value dumps
+- **Abstract**: Rewrite as a flowing academic abstract paragraph, not bullet points
+
+After completing both reference completion and field translation, save the updated `report_data.json`, then run `render_report.py`.
+
+### Running Stage 9
+
+```bash
+# Step 1: Extract data
+python scripts/output_report.py --policy "LTCI Pilot" --outcome "Fertility Rate" \
+    --stage3 data/auto/stage3_result.json \
+    --stage6 data/auto/stage6_confirmation.json \
+    --stage7 data/auto/stage7_main_result.json \
+    --stage8 data/auto/stage8_sensitivity.json \
+    --stage8-placebo data/auto/stage8_placebo.json \
+    --stage2-sections data/auto/stage2_sections.json \
+    --data data/merged/panel.dta \
+    --data-status data/auto/stage5_data_status.json \
+    --event-study data/auto/stage7_event_study.json \
+    --output data/auto/report_data.json
+
+# Step 2: LLM completes references (web search) + translates identification/abstract/conclusion → natural Chinese
+# (Read report_data.json, web-search incomplete refs, translate fields, save back)
+
+# Step 3: Render
+python scripts/render_report.py --data data/auto/report_data.json --compile
+```
+
+When using the pipeline orchestrator, the LLM must perform Step 2 between
+`output_report.py` and `render_report.py`.
+
+### CLI flags for output_report.py
+
+| Flag | Required | Description |
+|---|---|---|
+| `--policy` | Yes | Policy name |
+| `--outcome` | Yes | Outcome name |
+| `--stage3` | No | Stage 3 theoretical method JSON |
+| `--stage6` | No | Stage 6 confirmation JSON |
+| `--stage7` | No | Stage 7 estimation results JSON |
+| `--stage8` | No | Stage 8 sensitivity analysis JSON |
+| `--stage8-placebo` | No | Stage 8 placebo test JSON |
+| `--stage2-sections` | No | Stage 2 narrative sections JSON |
+| `--data` | No | Path to panel data (.dta/.csv) for descriptive stats |
+| `--data-status` | No | Stage 5 data_status JSON for data source appendix |
+| `--event-study` | No | Path to event study output JSON |
+| `--data-source` | No | Data source description |
+| `--data-span` | No | Data time span |
+| `--n-obs` | No | Number of observations |
+| `--output` | No | Output path for report_data.json |
+
+### Report sections
+
+| Section | Source | Content |
+|---|---|---|
+| 摘要 (Abstract) | Auto-generated from results | Policy, method, main finding, robustness summary, causal claim strength |
+| 一、引言 | Stage 2 sections | 1.1 研究背景, 1.2 文献综述 |
+| 二、制度背景与理论分析 | Stage 2 sections | 2.1 制度背景, 2.2 理论机制 |
+| 三、研究设计 | Stage 4 + Stage 7 + data | 3.1 数据来源与样本, 3.2 变量定义, 3.3 描述性统计, 3.4 识别策略与模型设定 |
+| 四、实证结果 | Stage 7 + Stage 8 | 4.1 基准回归结果, 4.2 事件研究（平行趋势检验）|
+| 五、稳健性检验 | Stage 8 | Consolidated checks: pass/fail + plain-language interpretation |
+| 六、方法选择链 | Stage 6 | Methods tried, outcomes, rejection reasons (only if method changed) |
+| 七、因果推断可信度评估 | Stage 6 | Strong/moderate/suggestive/not identifiable with justification |
+| 八、结论与政策建议 | Stage 2 sections or auto-generated | Findings, policy implications, limitations |
+| 参考文献 | Extracted from literature + canonical | Author-year references |
+| 附录 | Stage 3 + Stage 6 | A. 识别假设检验, B. 方法选择与识别策略, C. 数据来源明细, D. 数据质量评估 |
+
+### LaTeX compilation
+
+```bash
+xelatex paper.tex
+# Or for a polished output:
+xelatex paper.tex && xelatex paper.tex
+```
+
+Requires: `booktabs`, `siunitx`, `amsmath`, `fontspec`, `xeCJK` packages. System fonts: SimSun (宋体), SimHei (黑体), Times New Roman.
 
 ---
 
@@ -905,7 +1251,7 @@ python scripts/run_pipeline.py --policy "LTCI Pilot" --outcome "Fertility Rate" 
 python scripts/run_pipeline.py --state my_analysis.json --status
 ```
 
-Stages 1-2 (problem definition and policy research) and Stages 4-6 (data requirements, acquisition, and method confirmation) require user interaction. Stages 3, 7, 8, and 9 run automatically when their inputs are available.
+Stages 1-2 (problem definition and policy research) and Stages 4-5 (data requirements and acquisition) require user interaction. Stages 3, 6, 7, 8, and 9 run automatically when their inputs are available.
 
 The pipeline maintains a JSON state file tracking which stages are completed and what outputs each stage produced. This enables restartability — if a stage fails, fix the input and resume from that stage.
 
