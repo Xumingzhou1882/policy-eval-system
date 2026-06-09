@@ -12,6 +12,7 @@ Usage:
 """
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -196,6 +197,7 @@ def main():
     parser.add_argument("--time", default="year", help="Time column")
     parser.add_argument("--treated", default="treated", help="Treatment dummy column")
     parser.add_argument("--first-treated", default="first_treated", help="First-treated year column")
+    parser.add_argument("--output", default=None, help="Output path for results (.json)")
     args = parser.parse_args()
 
     if not HAS_STATS:
@@ -218,6 +220,12 @@ def main():
         type_label = c["type"]
         ids = f"t={c.get('treatment_time','')} ctrl={c.get('control_group','') or c.get('control_time','')}"
         print(f"  [{type_label}] {ids}:  est={c['estimate']:.4f}  weight={c['weight']:.4f}")
+
+    if args.output:
+        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+        with open(args.output, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        print(f"\nResults saved to {args.output}")
 
 
 if __name__ == "__main__":

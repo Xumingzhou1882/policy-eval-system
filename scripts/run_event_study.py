@@ -5,8 +5,8 @@ Generates relative-time coefficients and tests parallel pre-trends.
 
 Usage:
     python scripts/run_event_study.py --data data/merged/panel.dta \\
-                                      --outcome log_fertility \\
-                                      --entity city_id --time year \\
+                                      --outcome outcome_var \\
+                                      --entity entity_id --time year \\
                                       --first-treated first_treated \\
                                       --n-pre 5 --n-post 5 \\
                                       --plot event_study.png
@@ -178,8 +178,21 @@ def main():
         sys.exit(1)
 
     df = load_data(args.data)
+
+    # Support --first-treated as a numeric year (not just a column name).
+    # When all units are treated at the same time, the user may pass e.g. "2018".
+    ft_col = args.first_treated
+    if ft_col not in df.columns:
+        try:
+            ft_year = float(ft_col)
+            df["_first_treated_const"] = ft_year
+            ft_col = "_first_treated_const"
+        except ValueError:
+            print(f"Error: '{args.first_treated}' is neither a column nor a number.")
+            sys.exit(1)
+
     result = run_event_study(df, args.outcome, args.entity, args.time,
-                             args.first_treated, args.n_pre, args.n_post,
+                             ft_col, args.n_pre, args.n_post,
                              args.reference, args.controls)
 
     print("\n──── Event Study ────")

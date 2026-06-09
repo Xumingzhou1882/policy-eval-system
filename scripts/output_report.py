@@ -3,7 +3,7 @@ Extract structured data from all stage outputs into a unified JSON format
 for downstream rendering (Markdown / XeLaTeX).
 
 Usage:
-    python scripts/output_report.py --policy "LTCI Pilot" --outcome "Fertility Rate" \\
+    python scripts/output_report.py --policy "Environmental Tax Reform" --outcome "SO2 Emissions" \\
         --stage6 data/auto/stage6_confirmation.json \\
         --stage7 data/auto/stage7_main_result.json \\
         --stage8 data/auto/stage8_sensitivity.json \\
@@ -245,7 +245,8 @@ def _build_data_desc(data_path, data_meta, main_result, data_status, data_span):
         # Fallback without data_status — build a basic description
         outcome_label = main_result.get("outcome", "被解释变量")
         outcome_name = outcome_label if isinstance(outcome_label, str) else "被解释变量"
-        parts.append(f"被解释变量为{outcome_name}，核心解释变量为长护险试点状态与时间的交互项（staggered treatment）。")
+        method = main_result.get("method", "双重差分")
+        parts.append(f"被解释变量为{outcome_name}，核心解释变量为处理变量与时间虚拟变量的交互项。估计方法为{method}。")
         controls = main_result.get("controls", [])
         ctrl_labels = {
             "log_gdp_pc": "人均GDP（对数）", "log_population": "人口规模（对数）",
@@ -263,7 +264,7 @@ def _build_data_desc(data_path, data_meta, main_result, data_status, data_span):
         n_treated = data_meta.get("n_treated", 0)
         n_control = data_meta.get("n_control", 0)
         if n_treated and n_control:
-            parts.append(f"处理组包含{n_treated}个长护险试点城市（含2017年和2021年两批），对照组包含{n_control}个非试点城市。长护险试点城市名单及处理时点来自人社厅发〔2016〕80号和医保发〔2020〕37号文件。")
+            parts.append(f"处理组包含{n_treated}个单元，对照组包含{n_control}个单元。")
 
     # Paragraph 3: Processing notes
     if data_path:
@@ -318,7 +319,7 @@ def _find_or_create_subject_dir(policy_name: str, base_dir: Path) -> Path:
     """Find an existing subject folder or create a new one.
 
     Avoids creating duplicate folders for the same policy entered with
-    different spellings (e.g., 'LTCI' vs '长期护理保险试点').
+    different spellings (e.g., 'env-tax' vs '环境保护税改革').
     """
     base_dir.mkdir(parents=True, exist_ok=True)
     slug = _safe_filename(policy_name)
@@ -807,6 +808,27 @@ def build_report_data(
             if Path(es_path).exists():
                 with open(es_path, encoding="utf-8") as f:
                     event_study = json.load(f)
+    # Normalize event study to the format render_report.py expects:
+    # {"coefficients": {t: {coefficient, std_error, p_value}}, "pre_trends_test": {f_stat, p_value}}
+    if event_study and "coefficients" not in event_study:
+        if "periods" in event_study and "coefs" in event_study:
+            periods = event_study.get("periods", [])
+            coefs = event_study.get("coefs", [])
+            ses = event_study.get("ses", [])
+            pvals = event_study.get("pvals", [])
+            coeff_dict = {}
+            for i, t in enumerate(periods):
+                coeff_dict[str(t)] = {
+                    "coefficient": coefs[i] if i < len(coefs) else 0.0,
+                    "std_error": ses[i] if i < len(ses) else 0.0,
+                    "p_value": pvals[i] if i < len(pvals) else 1.0,
+                }
+            event_study["coefficients"] = coeff_dict
+        if "pre_trends_f" in event_study and "pre_trends_test" not in event_study:
+            event_study["pre_trends_test"] = {
+                "f_stat": event_study.get("pre_trends_f"),
+                "p_value": event_study.get("pre_trends_p"),
+            }
     data["event_study"] = event_study
 
     # ── Fallback attempts ──
@@ -1017,7 +1039,7 @@ def build_report_data(
         CTRL = "控制变量"
         variables = []
         oname = r.get("outcome", data.get("outcome", "被解释变量"))
-        variables.append((DEP, oname, "城市层面的生育率对数", ""))
+        variables.append((DEP, oname, f"{oname}（对数变换）" if "log" in str(oname).lower() else oname, ""))
         if is_cs:
             variables.append((EXP, "ATT(g,t)", "组别-时间特定平均处理效应（staggered treatment）", ""))
         else:
@@ -1034,82 +1056,65 @@ def build_report_data(
             label = ctrl_labels.get(ctrl, ctrl)
             variables.append((CTRL, label, "控制变量", ""))
 
-        # ── Detailed identification narrative ──
+        # ── Detailed identification narrative (generic, parameterized) ──
         ident_parts = []
+        entity_label = "省份" if "province" in str(data_path or "").lower() else "城市" if "city" in str(data_path or "").lower() else "单元"
 
         # 1. Policy design → identification logic
-        ident_parts.append(
-            "本研究利用长期护理保险试点分批推广的政策设计特征，构建因果识别策略。"
-            "长护险试点采用\"先行试点、逐步推广\"的方式，在国家层面分两批确定试点城市："
-            "第一批于2016年确定、2017年正式实施，覆盖承德、长春、上海、青岛等15个城市；"
-            "第二批于2020年确定、2021年正式实施，新增北京石景山区、天津、福州等14个城市。"
-            "全国其余约200多个地级及以上城市始终未纳入试点。"
-            "这一制度设计形成了典型的\"交错处理+从未处理对照组\"结构："
-            "不同城市在不同时点进入处理状态，存在大量从未受处理的对照组单元，"
-            "为利用双重差分策略识别因果效应提供了理想的准自然实验条件。"
-        )
+        if is_cs:
+            ident_parts.append(
+                f"本研究利用{policy}分批推广的政策设计特征，构建因果识别策略。"
+                f"该政策在不同{entity_label}分批次实施，形成了\"交错处理\"结构："
+                f"不同{entity_label}在不同时点进入处理状态，且存在未受处理的对照组单元，"
+                f"为利用交错型双重差分策略识别因果效应提供了准自然实验条件。"
+            )
+        else:
+            ident_parts.append(
+                f"本研究利用{policy}的政策设计特征，构建因果识别策略。"
+                f"该政策在全国范围内实施，但不同{entity_label}受到的\"处理强度\"存在差异，"
+                f"形成了高处理强度与低处理强度（或未处理）单元之间的可比变异。"
+                f"本文以政策实施时间为断点，以处理强度较高（或受政策直接影响）的{entity_label}为处理组，"
+                f"以处理强度较低（或不受政策直接影响）的{entity_label}为对照组，"
+                f"构造双重差分（Difference-in-Differences, DID）识别框架。"
+            )
 
         # 2. Why this specific method
         if is_cs:
             ident_parts.append(
                 f"本文采用Callaway & Sant'Anna（2021）提出的交错型双重差分估计量（staggered DID）"
-                f"作为基准识别策略。选择这一方法的理由如下："
+                f"作为基准识别策略。选择这一方法的原因是：处理时点交错的情境下，"
+                f"传统双向固定效应（TWFE）估计量可能产生\"负权重\"问题（Goodman-Bacon, 2021）。"
+                f"C&S估计量通过先估计组别-时间特定的ATT(g,t)，再按组别规模加权平均，避免了这一问题。"
+                f"本文以{n_control}个未受处理{entity_label}作为对照组。"
             )
-            reasons = [
-                "处理时点交错：不同城市在不同时点接受处理（2017年和2021年），传统双向固定效应（TWFE）"
-                "估计量在交错处理情境下可能产生\"负权重\"问题（Goodman-Bacon, 2021），"
-                "即某些组别-时期的处理效应被赋予负权重，导致估计量的加权平均难以解释为有意义的因果参数。"
-                "C&S估计量通过先估计组别-时间特定的ATT(g,t)，再按组别规模加权平均，"
-                "避免了负权重问题。",
-                f"存在稳定的对照组：{n_control}个从未参与试点的城市提供了对照组，"
-                "这些城市不受长护险政策的直接影响，构成了\"从未处理\"（never-treated）对照组。"
-                "C&S估计量支持多种对照组选择（从未处理、尚未处理），本研究采用从未处理作为基准。",
-                "可检验的识别假设：平行趋势假设和无预期效应假设可通过事件研究法进行统计检验。"
-                f"本文构造了处理前5期和处理后5期的事件研究，通过F检验评估处理前各期系数的联合显著性。",
-            ]
-            for i, reason in enumerate(reasons, 1):
-                ident_parts.append(f"（{i}）{reason}")
         else:
+            method_label = main_result.get("method", "DID")
             ident_parts.append(
-                f"本文采用双重差分法（DID）作为基准识别策略，利用处理组和对照组在政策实施前后"
+                f"本文采用{method_label}作为基准识别策略，利用处理组和对照组在政策实施前后"
                 "的结果差异，通过双重差分消除不随时间变化的未观测混杂因素。"
             )
 
         # 3. Source of identification variation
         ident_parts.append(
-            "核心识别变异的来源为：同一时点上，已进入长护险试点的城市与尚未（或从未）"
-            "进入试点的城市之间，生育率变化的系统性差异。城市固定效应吸收了所有不随时间变化的"
-            "城市特征（如地理区位、文化传统等），年份固定效应吸收了所有城市共同面临的"
-            "时间趋势冲击（如全国性生育政策调整、宏观经济波动等），"
-            "二者的联合控制使得\"处理组×处理后\"的交互项系数可以解释为长护险对生育率的因果效应。"
+            f"核心识别变异的来源为：同一时点上，处理组{entity_label}与对照组{entity_label}之间"
+            f"{outcome}变化的系统性差异。{entity_label}固定效应吸收了所有不随时间变化的"
+            f"{entity_label}层面特征，年份固定效应吸收了所有{entity_label}共同面临的"
+            f"时间趋势冲击，二者的联合控制使得\"处理组×处理后\"的交互项系数可以解释为"
+            f"{policy}对{outcome}的因果效应。"
         )
 
         # 4. Key identifying assumptions
         ident_parts.append(
             "该方法依赖以下核心识别假设：\n"
             "  • 平行趋势假设（Parallel Trends）【可检验】：在不受处理的反事实情境下，"
-            "处理组和对照组的生育率变化趋势应当相同。通过事件研究法中处理前各期系数的联合F检验进行评估。\n"
-            "  • 无预期效应（No Anticipation）【可检验】：城市在正式进入长护险试点之前，"
-            "不应因预期政策变化而提前调整生育行为。通过检验处理前一期（t=-1）系数是否接近零来验证。\n"
-            "  • 稳定单元处理值假设（SUTVA）【需论证】：一个城市的试点状态不应影响其他城市的生育率。"
-            "鉴于长护险的参保资格和待遇享受具有明确的地域边界（以城市为单位），"
-            "跨城市的政策溢出效应有限，该假设基本合理。\n"
-            "  • 条件独立性假设（CIA/Unconfoundedness）【需论证】：在控制城市固定效应、"
-            "年份固定效应及可观测时变控制变量的条件下，处理分配与潜在结果独立。"
-            "试点城市的选择基于可观测的城市特征（如老龄化程度、经济发展水平、医保基金承受能力），"
-            "本文通过控制这些变量来增强该假设的可信度。"
-        )
-
-        # 5. Handling concurrent policies
-        ident_parts.append(
-            "需要特别指出的是，长护险试点的推广期间与中国生育政策的重大调整存在时间重叠："
-            "2016年全面二孩政策实施（与第一批试点几乎同步），2021年三孩政策宣布（与第二批试点接近）。"
-            "本研究通过以下策略应对这一挑战：（1）全面二孩和三孩政策是全国性政策，对所有城市同时生效，"
-            "其影响被年份固定效应吸收，不会系统地混淆城市层面试点状态的因果效应；"
-            "（2）利用两批试点的交错时点（2017年和2021年），在同一全国性政策环境下识别不同试点时期的"
-            "差异化处理效应，增强了因果推断的可信度；"
-            "（3）2021年三孩政策的影响有限（已有研究表明有意愿生育三孩的家庭比例极低），"
-            "且样本期至2022年，三孩政策后的观测期较短，其潜在混淆作用较小。"
+            f"处理组和对照组的{outcome}变化趋势应当相同。通过事件研究法中处理前各期系数的联合F检验进行评估。\n"
+            "  • 无预期效应（No Anticipation）【可检验】：受处理单元在政策正式实施前，"
+            "不应因预期到政策变化而提前调整行为。通过检验处理前各期系数是否接近零来验证。\n"
+            "  • 稳定单元处理值假设（SUTVA）【需论证】：一个单元的处理状态不应影响其他单元的结果变量。"
+            "该假设的合理性取决于政策的具体设计，需根据制度背景进行论证。\n"
+            "  • 条件独立性假设（CIA/Unconfoundedness）【需论证】：在控制固定效应"
+            "及可观测时变控制变量的条件下，处理分配与潜在结果独立。"
+            "通过纳入相关控制变量和进行Oster界限分析来增强该假设的可信度。"
         )
 
         # 6. Data and dimensions
@@ -1117,7 +1122,7 @@ def build_report_data(
             f"本文使用的数据集为{n_years}年（2010-2022）中国{n_cities}个地级及以上城市的面板数据，"
             f"其中处理组{n_treated}个城市（分{n_cohorts}个处理批次）、对照组{n_control}个城市。"
             f"共{n_periods}个时期，合计{data['data_meta'].get('n_obs', '')}个观测值。"
-            f"标准误在城市层面聚类以处理组内序列相关问题。"
+            f"标准误在{entity_label}层面聚类以处理组内序列相关问题。"
         )
 
         data["model_spec"] = {
@@ -1275,7 +1280,7 @@ def main():
         epilog="""
 Examples:
   # Output structured JSON for rendering
-  python output_report.py --policy "LTCI Pilot" --outcome "Fertility Rate" \\
+  python output_report.py --policy "Environmental Tax" --outcome "log_so2" \\
       --stage6 stage6_confirmation.json --stage7 stage7_main_result.json \\
       --output report_data.json
 

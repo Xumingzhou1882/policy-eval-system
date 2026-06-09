@@ -7,8 +7,8 @@ distribution of placebo coefficients.
 
 Usage:
     python scripts/placebo_test.py --data data/merged/panel.dta \\
-                                   --outcome log_fertility \\
-                                   --entity city_id --time year \\
+                                   --outcome outcome_var \\
+                                   --entity entity_id --time year \\
                                    --treated treated --post post \\
                                    --n-sim 1000 --plot placebo.png
 """
@@ -105,7 +105,7 @@ def run_staggered_placebo(df: pd.DataFrame, outcome: str, entity_col: str,
         "placebo_std": float(np.std(placebo_ests)),
         "p_value": float(p_value),
         "n_sim_valid": int(len(placebo_ests)),
-        "passed": p_value < 0.05,
+        "passed": bool(p_value < 0.05),
     }
 
 
@@ -153,7 +153,7 @@ def run_standard_placebo(df: pd.DataFrame, outcome: str, entity_col: str,
         "placebo_std": float(np.std(placebo_ests)),
         "p_value": float(p_value),
         "n_sim_valid": int(len(placebo_ests)),
-        "passed": p_value < 0.05,
+        "passed": bool(p_value < 0.05),
     }
 
 

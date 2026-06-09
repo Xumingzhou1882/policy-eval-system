@@ -95,7 +95,7 @@ def _find_or_create_subject_dir(policy_name: str, base_dir):
 def _safe_sort_key(k):
     """Sort event study period keys safely (handle non-integer keys like 'avg', 'post_avg')."""
     try:
-        return (0, int(k))
+        return (0, float(k))
     except (ValueError, TypeError):
         return (1, str(k))
 
@@ -139,7 +139,10 @@ def _build_report(data):
     # 摘要 (Abstract)
     # ═══════════════════════════════════════════════════════════════
     S("摘要")
-    if coef:
+    custom_abstract = sec.get("abstract", "")
+    if custom_abstract:
+        B("paragraph", custom_abstract)
+    elif coef:
         direction = "提高" if coef > 0 else "降低"
         abs_lines = []
         abs_lines.append(f"本文评估了{policy}对{outcome}的因果效应。")
@@ -441,7 +444,7 @@ def _build_report(data):
             name = r.get("name", "Unknown check")
             passed = r.get("passed", False)
             interp = r.get("interpretation", "")
-            icon = "✓" if passed else "✗"
+            icon = "Pass" if passed else "Fail"
             checks_list.append([icon, name, "通过" if passed else "未通过", interp])
         B("table", headers=["", "检验", "结果", "说明"], rows=checks_list,
           caption="稳健性检验结果",
@@ -805,7 +808,10 @@ def main():
     p.add_argument("--data", required=True, help="Path to report_data.json (from output_report.py)")
     p.add_argument("--md", default=None, help="Output path for Markdown")
     p.add_argument("--tex", default=None, help="Output path for XeLaTeX")
-    p.add_argument("--compile", action="store_true", help="Compile LaTeX to PDF")
+    p.add_argument("--compile", action="store_true", default=True,
+                   help="Compile LaTeX to PDF (default: on if xelatex found)")
+    p.add_argument("--no-compile", action="store_false", dest="compile",
+                   help="Skip PDF compilation")
     args = p.parse_args()
 
     with open(args.data, encoding="utf-8") as f:

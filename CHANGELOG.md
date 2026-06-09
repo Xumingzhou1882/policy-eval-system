@@ -1,5 +1,105 @@
 # 修改日志
 
+## 2026-06-04 — Stage 6 自动化
+
+### Stage 6: 从手动验证到确定性脚本
+
+Stage 6 是 pipeline 中最后一个未自动化的方法论阶段。现在有了专用脚本 `stage6_confirm.py`（约 700 行），实现了与 Stage 3 同水准的确定性自动化。
+
+**新增脚本：**
+
+1. **`stage6_confirm.py`** — 最终方法确认引擎：
+   - 双层数据结构：`AssumptionVerdict`（假设判定）+ `DiagnosticResult`（诊断结果）+ `FallbackAttempt`（备选尝试）+ `MethodConfirmation`（完整确认）
+   - 假设→检验映射注册表：覆盖 8 种机制，20+ 个可检验假设，每个都有对应诊断函数
+   - 内联诊断函数（无需子进程）：倾向得分重叠检查、协变量平衡、合规率检查、分组覆盖率、剂量-反应事件研究
+   - 子进程诊断包装器（调用现有脚本）：事件研究、Bacon 分解、McCrary、IV 第一阶段、SCM、Synthetic DID、DML
+   - 确定性降级引擎：当主方法失败时，按 Stage 3 的 fallbacks 排序依次尝试备选方法
+   - 为 Stage 7 生成标准化规范字典（含 entity_col、time_col、covariates 等所有派发字段）
+   - CLI 独立使用或通过 `run_pipeline.py` 调用
+
+**修改文件：**
+
+2. **`run_pipeline.py`**：
+   - 新增 `run_stage6()` 函数：调用 `stage6_confirm.py`，加载其输出至状态文件
+   - Stage 7 和 Stage 8 现优先从 `stage6.specification` 读取参数，向后兼容旧的手动 stage6 键
+   - 主循环：原先打印"需用户检查"的 3 行代码替换为 `run_stage6()` 调用
+   - 新增 `_resolve_data_path()` 辅助函数
+
+3. **`bacon_decomp.py`**：
+   - 新增 `import json`
+   - 新增 `--output` 参数：结果可保存为 JSON（后续 Stage 6 的程序化消费需要）
+   - JSON 输出包含 `negative_weight_pct`、`n_comparisons` 及完整的比较列表
+
+**文档更新：**
+
+4. **`SKILL.md`**：
+   - Stage 6 章节：113 行叙述性假设检验指南替换为脚本使用文档、诊断覆盖表、JSON 模式及确定性语义
+   - 流水线编排：描述从"需用户交互"更新为"自动化"
+   - Stage 8 章节新增说明：当 Stage 6 确认依赖 CIA 的方法时，Oster 边界至为重要
+
+### 架构说明
+
+Stage 6 与 Stage 3 共享相同模式：
+- **确定性**：相同输入 → 相同输出（诊断函数为纯规则或子进程调用）
+- **结构化输出**：JSON 模式（`stage6_confirmation.json`）供下游消费
+- **子进程隔离**：诊断通过调用 `/scripts/` 下的同级脚本运行，而非直接导入（故障隔离、无循环导入）
+- **语言为主**：假设名称与 Stage 3 输出精确匹配，确保所有假设均有注册表条目对应
+
+## 2026-06-04 — Stage 9 报告学术标准化
+
+### 数据与渲染分离 + MD/XeLaTeX 双输出
+
+Stage 9 拆为两步流水线：`output_report.py` 提取并结构化所有阶段数据 → `render_report.py` 渲染为学术格式。
+
+**新增脚本：**
+
+1. **`render_report.py`** — 双格式渲染引擎（约 400 行）：
+   - `render_markdown(data) → str`：pipe 表格 Markdown，GitHub/VS Code 可直接预览，可通过 pandoc 转 PDF/Word
+   - `render_latex(data) → str`：XeLaTeX 完整文档（`booktabs` 三线表 + `siunitx` 数字对齐 + `xeCJK` 中文支持 + `fontspec` 系统字体），`xelatex` 一键编译出 PDF
+   - 共享格式化函数：`_stars()`/`_fmt_coef()`/`_fmt_se()`/`_fmt_pval()` 保证两种格式的数值渲染一致
+   - 9 个标准章节：主回归表、假设检验表、事件研究表、方法降级链、稳健性检验表、数据质量、研究局限、警告、因果强度
+   - 章节按条件渲染（无常出现数据时自动跳过）
+
+**重构文件：**
+
+2. **`output_report.py`** — 从文本生成器重构为结构化数据提取器：
+   - 产出 `report_data.json`：所有渲染所需的键值（`method_chain`、`main_result`、`assumptions`、`event_study`、`fallback_attempts`、`robustness`、`data_quality`、`limitations`、`warnings`、`causal_claim_strength`）
+   - `build_report_data()` 为核心入口函数
+   - 保留 `generate_text_report()` 用于终端预览（`--text` 参数）
+   - Stage 7 wrapper dict 解包 + key 搜索列表不变
+   - 事件研究数据从 Stage 7 event_study 输出文件自动加载
+
+**修改文件：**
+
+3. **`run_pipeline.py`** — `run_stage9()` 两步执行：
+   - Step 1：调用 `output_report.py` → `report_data.json`
+   - Step 2：调用 `render_report.py` → `final_report.md` + `final_report.tex`
+   - 输出文件追踪至 state：`report_data`、`report_md`、`report_tex`
+
+4. **`SKILL.md`** Stage 9 章节：替换为架构说明 + 报告内容表 + XeLaTeX 编译说明
+5. **`CHANGELOG.md`**：新增本条
+
+## 2026-06-04 — Stage 9 报告撰写重构
+
+### `output_report.py` 重写
+
+旧版与改造后的 Stage 6 输出字段不兼容（读的是 `assumptions`/`holds`/`method_switch`，实际是 `assumption_verdicts`/`verdict`/`method_changed`），且 Stage 7 wrapper dict 未处理、Stage 8 checks 嵌套层级错误。重写后：
+
+- **字段对齐**：所有 Stage 6 引用改为实际字段名。假设从 `assumption_verdicts` 读取，因果强度直接复用 Stage 6 的 `causal_claim_strength`（删除了重复的 `_assess_strength()` 函数）。
+- **Stage 7 格式统一**：新增 `_unwrap_stage7()` 自动解包 wrapper dict（`callaway_santanna`/`2sls`/`liml`），扩展 key 搜索列表覆盖所有脚本的输出字段名（`coefficient`/`att`/`overall_att`/`late`/`ate`/`aggregate_att`）。SCM 无 SE 时从 `placebo_std` 推断。
+- **Stage 8 整合**：`_normalize_stage8_checks()` 从 sensitivity 的 `summary.checks` 提取 checks，并自动将 placebo test 结果合并为独立的 check 条目。
+- **报告内容丰富**：新增假设检验表（含诊断值、阈值、解读）、降级链展示、数据质量摘要、warnings 章节。
+- **新增 `--stage8-placebo` CLI 参数**。
+
+### `run_pipeline.py` 更新
+
+- `run_stage9()` 修复：新增传递 `--stage6`（之前从未传递）、`--stage8-placebo`、`--data-source`
+
+### 文档更新
+
+- `SKILL.md` Stage 9 章节：ASCII 模板替换为实际脚本用法、报告各章节说明、格式差异处理机制
+- `CHANGELOG.md`：新增本次条目
+
 ## 2026-06-03 (晚间 - 决策树完善)
 
 ### 新 Rule 3：工具变量自动路由

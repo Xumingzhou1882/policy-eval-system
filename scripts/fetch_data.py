@@ -63,6 +63,9 @@ class FetchResult:
     warnings: list[str] = field(default_factory=list)
     attempts: int = 0           # Number of attempts (including retries)
     fallback_used: Optional[str] = None  # Name of fallback that succeeded
+    source_label: str = ""      # Human-readable source (e.g., "世界银行API", "中国城市统计年鉴 via akshare")
+    description: str = ""       # Variable description from variable_map.json
+    tier: str = ""              # Data tier: A (public API), B (registration), C (manual), D (unavailable)
 
     def is_ok(self) -> bool:
         return self.status in ("success", "cached")
@@ -409,6 +412,68 @@ _TRANSFORMS = {
     "exchange_rate": _transform_exchange_rate,
     "pmi": _transform_pmi,
 }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Source metadata — maps variable_map source keys to human-readable labels
+# ═══════════════════════════════════════════════════════════════════════
+
+_SOURCE_LABELS = {
+    "world_bank": ("世界银行API (World Bank)", "A"),
+    "akshare_city": ("中国城市统计年鉴 (via akshare)", "A"),
+    "akshare_province": ("中国省级统计年鉴 (via akshare)", "A"),
+    "akshare": ("akshare 公开数据", "A"),
+    "akshare_stock_index": ("akshare 股票指数数据", "A"),
+    "akshare_stock_individual": ("akshare 个股数据", "A"),
+    "akshare_custom": ("akshare 数据", "A"),
+    "yfinance": ("Yahoo Finance", "A"),
+    "yfinance_global_index": ("Yahoo Finance 全球指数", "A"),
+    "census": ("中国人口普查数据 (via akshare)", "A"),
+    "nbs": ("国家统计局 API (data.stats.gov.cn)", "A"),
+    "fred": ("FRED 美联储经济数据库", "A"),
+    "oecd": ("OECD API", "A"),
+    "eurostat": ("Eurostat API", "A"),
+    "nyc_taxi": ("NYC TLC Trip Data (AWS Open Data)", "A"),
+    "nyc_taxi_agg": ("NYC TLC Trip Data (AWS Open Data)", "A"),
+    "citi_bike": ("Citi Bike NYC (AWS Open Data)", "A"),
+    "epa_aqs": ("EPA AQS 美国空气质量", "A"),
+    "noaa_gsod": ("NOAA GSOD 全球气象数据", "A"),
+    "bls": ("BLS 美国劳工统计局", "A"),
+    "zillow": ("Zillow Home Value Index", "A"),
+    "nyc_311": ("NYC 311 公共服务请求", "A"),
+    "chicago_crimes": ("Chicago Crime Data", "A"),
+    "ipums": ("IPUMS USA 普查微观数据", "B"),
+}
+
+
+def _source_meta(source_key: str, description: str = "") -> tuple[str, str, str]:
+    """Return (source_label, description, tier) for a given source key."""
+    label, tier = _SOURCE_LABELS.get(source_key, (f"{source_key} 数据", "C"))
+    return label, description, tier
+
+
+def results_to_data_status(results: dict) -> dict:
+    """Convert fetch results (dict[str, FetchResult]) to data_status dict
+    for pipeline state tracking.
+
+    Usage in Stage 5 (LLM calls this after fetching):
+        results = fetch_from_variable_map(["gdp", "population", ...])
+        data_status = results_to_data_status(results)
+        # Then write data_status into the pipeline state JSON.
+    """
+    data_status = {}
+    for var_name, r in results.items():
+        entry = {
+            "tier": r.tier or "未知",
+            "status": r.status,
+            "description": r.description or var_name,
+            "source": r.source_label or "",
+            "path": r.path or "",
+        }
+        if r.rows:
+            entry["rows"] = r.rows
+        data_status[var_name] = entry
+    return data_status
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -2703,8 +2768,8 @@ def _fetch_one_variable(var_name: str, entry: dict, start_year: int,
                         indicator_override: str = None) -> FetchResult:
     """Fetch a single variable from its variable_map entry. Thread-safe."""
     source = entry.get("source", "")
-    print(f"  Fetching {var_name} ({entry.get('description', '')}) "
-          f"via {source}...")
+    source_label, description, tier = _source_meta(source, entry.get("description", ""))
+    print(f"  Fetching {var_name} ({description}) via {source}...")
 
     try:
         if source == "world_bank":
@@ -2740,7 +2805,8 @@ def _fetch_one_variable(var_name: str, entry: dict, start_year: int,
             else:
                 return FetchResult(
                     variable=var_name, status="error",
-                    errors=[f"Unknown custom source: {custom}"])
+                    errors=[f"Unknown custom source: {custom}"],
+                    source_label=source_label, description=description, tier=tier)
 
         elif source == "census":
             indicator = entry.get("census_indicator", var_name)
@@ -2837,14 +2903,16 @@ def _fetch_one_variable(var_name: str, entry: dict, start_year: int,
         else:
             return FetchResult(
                 variable=var_name, status="error",
-                errors=[f"Unknown source type: {source}"])
+                errors=[f"Unknown source type: {source}"],
+                source_label=source_label, description=description, tier=tier)
 
         if df.empty:
             return FetchResult(
                 variable=var_name, status="empty",
                 warnings=["no data returned"],
                 errors=[f"Source {source} returned no data for "
-                        f"'{entry.get('description', var_name)}'"])
+                        f"'{description}'"],
+                source_label=source_label, description=description, tier=tier)
         elif save:
             meta = {
                 "source": source,
@@ -2856,17 +2924,20 @@ def _fetch_one_variable(var_name: str, entry: dict, start_year: int,
                                            meta=meta)
             return FetchResult(
                 variable=var_name, status="success",
-                df=df, path=path, rows=len(df))
+                df=df, path=path, rows=len(df),
+                source_label=source_label, description=description, tier=tier)
         else:
             return FetchResult(
                 variable=var_name, status="success",
-                df=df, rows=len(df))
+                df=df, rows=len(df),
+                source_label=source_label, description=description, tier=tier)
 
     except Exception as e:
         return FetchResult(
             variable=var_name, status="error",
             errors=[f"{type(e).__name__}: {str(e)}",
-                    traceback.format_exc()[-500:]])
+                    traceback.format_exc()[-500:]],
+            source_label=source_label, description=description, tier=tier)
 
 
 def fetch_from_variable_map(variable_names: list[str],
@@ -2903,20 +2974,25 @@ def fetch_from_variable_map(variable_names: list[str],
         if var_name not in var_map:
             result = FetchResult(
                 variable=var_name, status="error",
-                errors=[f"'{var_name}' not found in variable_map.json"])
+                errors=[f"'{var_name}' not found in variable_map.json"],
+                description=var_name)
             results[var_name] = result
             print(f"  ✗ {var_name}: not in variable map")
             continue
 
+        entry = var_map[var_name]
+
         if not force and is_cached(var_name, max_age_hours):
             cached_path = str(DATA_AUTO / f"{var_name}.json")
+            sl, desc, tier = _source_meta(entry.get("source", ""), entry.get("description", ""))
             result = FetchResult(
-                variable=var_name, status="cached", path=cached_path)
+                variable=var_name, status="cached", path=cached_path,
+                source_label=sl, description=desc, tier=tier)
             results[var_name] = result
             print(f"  ✓ {var_name}: cached (use --force to re-fetch)")
             continue
 
-        to_fetch.append((var_name, var_map[var_name]))
+        to_fetch.append((var_name, entry))
 
     if not to_fetch:
         return results
