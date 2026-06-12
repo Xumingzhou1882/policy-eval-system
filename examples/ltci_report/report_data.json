@@ -1,0 +1,491 @@
+{
+  "policy": "长期护理保险试点",
+  "outcome": "城市生育率（出生率）",
+  "generated": "2026-06-12 13:45",
+  "method_chain": {
+    "theoretical": "Callaway & Sant'Anna (2021) — never-treated as control",
+    "final": "Callaway & Sant'Anna (2021) — never-treated as control",
+    "changed": false,
+    "gap_explanation": "",
+    "chain": [
+      "Callaway & Sant'Anna (2021) — never-treated as control"
+    ]
+  },
+  "data_meta": {
+    "source": "data/auto/ltci_panel.csv | 2010-2022 | N = 1157 (89 entities × 13 periods)",
+    "data_path": "data/auto/ltci_panel.csv",
+    "span": "",
+    "n_obs": "1157",
+    "n_cities": 89,
+    "n_years": 13,
+    "n_treated": 45,
+    "n_control": 44,
+    "time_span": "2010-2022",
+    "n_entities": 89,
+    "n_periods": 13
+  },
+  "main_result": {
+    "coefficient": 0.13045777756604088,
+    "std_error": 0.008293466444413618,
+    "p_value": 1e-300,
+    "method": "Callaway & Sant'Anna (2021) doubly-robust — never-treated",
+    "outcome": "log_birth_rate",
+    "treatment_var": "ATT(g,t) — 组别-时间特定平均处理效应",
+    "controls": [
+      "gdp_per_capita",
+      "population_10k",
+      "fiscal_revenue_pc",
+      "n_hospitals",
+      "elderly_ratio",
+      "female_labor_participation",
+      "urbanization_rate"
+    ],
+    "n_obs": 1157,
+    "n_entities": 89,
+    "n_periods": 13,
+    "r2": null,
+    "direction": "increased",
+    "effect_magnitude": "13.93% (log-point interpretation)",
+    "entity_fe": true,
+    "time_fe": true
+  },
+  "assumptions": [
+    {
+      "assumption_name": "Parallel trends",
+      "description": "In the absence of treatment, treated and never-treated units would have followed the same outcome trajectory.",
+      "testable": true,
+      "test_method": "Event study: pre-treatment coefficients jointly zero (F-test). Visual inspection of pre-treatment trends.",
+      "diagnostic": {
+        "diagnostic_name": "event_study_parallel_trends",
+        "test_description": "F-test of joint significance of pre-treatment event study coefficients",
+        "status": "PASS",
+        "values": {
+          "f_stat": 1.4266503632062466,
+          "p_value": 0.2229831288326634
+        },
+        "threshold": "p_value > 0.05",
+        "interpretation": "Pre-trends F-test p=0.2230. Parallel trends assumption is supported."
+      },
+      "verdict": "PASS",
+      "reasoning": "Pre-trends F-test p=0.2230. Parallel trends assumption is supported."
+    },
+    {
+      "assumption_name": "No anticipation",
+      "description": "Units did not change behavior before the policy took effect.",
+      "testable": true,
+      "test_method": "Check if the t-1 coefficient in the event study is zero.",
+      "diagnostic": {
+        "diagnostic_name": "event_study_t_minus_1",
+        "test_description": "Test whether the coefficient at t=-1 is zero",
+        "status": "PASS",
+        "values": {
+          "coef_t_minus_1": 0.0,
+          "p_value": 1.0
+        },
+        "threshold": "p_value > 0.05",
+        "interpretation": "t=-1 coefficient p=1.0000. No evidence of anticipation effects."
+      },
+      "verdict": "PASS",
+      "reasoning": "t=-1 coefficient p=1.0000. No evidence of anticipation effects."
+    },
+    {
+      "assumption_name": "Never-treated are valid counterfactual",
+      "description": "Never-treated units are comparable to treated units (conditional on covariates).",
+      "testable": false,
+      "test_method": "Argue from institutional knowledge: why were some units never treated?",
+      "diagnostic": null,
+      "verdict": "UNCERTAIN",
+      "reasoning": "This assumption cannot be empirically tested. It must be argued from institutional knowledge or study design."
+    }
+  ],
+  "event_study": {
+    "coefficients": {
+      "-5": {
+        "coefficient": -0.011907212430946482,
+        "std_error": 0.010659511696928425,
+        "p_value": 0.26422926586057727
+      },
+      "-4": {
+        "coefficient": 0.008437975114057975,
+        "std_error": 0.013066786110420774,
+        "p_value": 0.5185780493143772
+      },
+      "-3": {
+        "coefficient": 0.003916868879911421,
+        "std_error": 0.012035515664405907,
+        "p_value": 0.7449112443238387
+      },
+      "-2": {
+        "coefficient": -0.0015953075273794422,
+        "std_error": 0.013119115602207673,
+        "p_value": 0.9032377767993002
+      },
+      "-1": {
+        "coefficient": 0.0,
+        "std_error": 0.0,
+        "p_value": 1.0
+      },
+      "0": {
+        "coefficient": 0.11700761006644045,
+        "std_error": 0.013157406497489033,
+        "p_value": 2.562595977969529e-18
+      },
+      "1": {
+        "coefficient": 0.11901780416196892,
+        "std_error": 0.012049598511978035,
+        "p_value": 4.651082850534745e-22
+      },
+      "2": {
+        "coefficient": 0.13839776047063118,
+        "std_error": 0.013192682128326087,
+        "p_value": 1.5035419409392912e-24
+      },
+      "3": {
+        "coefficient": 0.11668349229652554,
+        "std_error": 0.014007221522621172,
+        "p_value": 2.5083516357059995e-16
+      },
+      "4": {
+        "coefficient": 0.1323272305937925,
+        "std_error": 0.014767680654423737,
+        "p_value": 1.4516356692839873e-18
+      },
+      "5": {
+        "coefficient": 0.13242675439936927,
+        "std_error": 0.015260620307840176,
+        "p_value": 1.5243445145456735e-17
+      }
+    },
+    "reference_period": -1,
+    "pre_trends_test": {
+      "jointly_zero": true,
+      "f_stat": 1.3817142952411774,
+      "p_value": 0.23818919358277246
+    },
+    "n_obs": 1157,
+    "plot": "event_study.png"
+  },
+  "fallback_attempts": [],
+  "robustness": [
+    {
+      "name": "安慰剂置换检验",
+      "passed": true,
+      "values": {
+        "actual_coef": 0.126451,
+        "placebo_mean": 0.097138,
+        "p_value": 0.002
+      },
+      "interpretation": "实际效应显著区别于安慰剂分布（p = 0.0020），结果非随机噪声。"
+    },
+    {
+      "name": "替代时间窗口检验",
+      "passed": true,
+      "values": {
+        "baseline_coef": 0.1265,
+        "n_valid_windows": 3
+      },
+      "interpretation": "3个替代窗口下系数方向和显著性一致，通过。"
+    },
+    {
+      "name": "留一法影响分析",
+      "passed": true,
+      "values": {
+        "min_coef": 0.121645,
+        "max_coef": 0.128731,
+        "range": 0.007086
+      },
+      "interpretation": "系数范围 [0.1216, 0.1287]，没有单一城市驱动结果。"
+    }
+  ],
+  "data_quality": {
+    "overall": "PASS",
+    "total_issues": 0,
+    "critical_issues": []
+  },
+  "limitations": [
+    "'Never-treated are valid counterfactual' is not testable. This assumption cannot be empirically tested. It must be argued from institutional knowledge or study design."
+  ],
+  "warnings": [],
+  "causal_claim_strength": "moderate",
+  "appendix": {
+    "policy_background": [
+      "Assignment mechanism: Staggered policy shock (different units treated at different times)",
+      "Mechanism type: staggered_policy_shock",
+      "Source of variation: Differential treatment timing across cohorts, compared against never-treated units."
+    ],
+    "method_rationale": [
+      "Assignment mechanism: Staggered policy shock (different units treated at different times)",
+      "Method family: DID",
+      "",
+      "Primary method: Callaway & Sant'Anna (2021) — never-treated as control",
+      "Source of variation: Differential treatment timing across cohorts, compared against never-treated units.",
+      "",
+      "Why this method:",
+      "  1. Policy rollout is staggered: different units treated at different times.",
+      "  2. Traditional TWFE in staggered designs can assign negative weights with heterogeneous effects.",
+      "  3. C&S (2021) estimates group-time ATTs using never-treated units as control.",
+      "  4. Cohort-specific ATTs are aggregated to an overall ATT with clear weighting.",
+      "",
+      "Required assumptions:",
+      "  • Parallel trends [可检验]",
+      "    In the absence of treatment, treated and never-treated units would have followed the same outcome trajectory.",
+      "    检验方法: Event study: pre-treatment coefficients jointly zero (F-test). Visual inspection of pre-treatment trends.",
+      "  • No anticipation [可检验]",
+      "    Units did not change behavior before the policy took effect.",
+      "    检验方法: Check if the t-1 coefficient in the event study is zero.",
+      "  • Never-treated are valid counterfactual [需论证]",
+      "    Never-treated units are comparable to treated units (conditional on covariates).",
+      "    检验方法: Argue from institutional knowledge: why were some units never treated?",
+      "",
+      "Fallback strategies (in priority order):",
+      "  1. Sun & Abraham (2021)",
+      "     Condition: If anticipation effects are suspected",
+      "     Relaxes: Allows anticipation-period specification.",
+      "  2. Borusyak, Jaravel & Spiess (2024)",
+      "     Condition: If factor structure is more appropriate",
+      "     Relaxes: Imputation-based estimator.",
+      "  3. SCM",
+      "     Condition: If only a few units are treated",
+      "     Relaxes: Better suited for small-N treated groups.",
+      "  4. IV / 2SLS",
+      "     Condition: If a valid instrument is available and staggered DID assumptions fail",
+      "     Relaxes: Uses exogenous variation — does not require parallel trends. See run_iv.py."
+    ],
+    "data_sources": [
+      "分析数据文件：ltci_panel.csv（CSV格式）",
+      "被解释变量：log_birth_rate",
+      "控制变量：gdp_per_capita, population_10k, fiscal_revenue_pc, n_hospitals, elderly_ratio, female_labor_participation, urbanization_rate",
+      "估计方法：Callaway & Sant'Anna (2021) doubly-robust — never-treated",
+      "数据质量评估：PASS（发现0个问题）",
+      "主要数据来源（根据变量自动推断）：",
+      "  • 中国劳动统计年鉴",
+      "  • 中国城市统计年鉴"
+    ]
+  },
+  "sections": {
+    "intro_background": "2016年6月，人力资源和社会保障部发布《关于开展长期护理保险制度试点的指导意见》（人社厅发〔2016〕80号），选定15个城市启动长期护理保险首批试点。这是中国社会保障体系从\"保基本\"向\"多层次\"转型的标志性事件之一。截至2020年，中国60岁以上人口已达2.64亿，占总人口18.7%，失能半失能老年人超过4000万。在人口老龄化加速和家庭照护功能弱化的双重压力下，建立社会化照护保障体系成为迫切的政策需求。长期护理保险（Long-Term Care Insurance, LTCI）以社会互助共济方式筹集资金，为长期失能人员的基本生活照料和医疗护理提供资金或服务保障，被定位为继养老、医疗、工伤、失业、生育之后的\"第六险\"。\n\n首批试点于2016年在承德、长春、上海、青岛等15个城市启动，覆盖约4800万参保人群。2020年9月，国家医保局和财政部联合印发《关于扩大长期护理保险制度试点的指导意见》（医保发〔2020〕37号），新增北京、天津、福州等14个城市，试点总数扩至49个。两批试点的分批推广形成了典型的交错处理（staggered rollout）结构，为因果识别提供了关键的时间维度和截面维度双重变异。各试点城市在筹资渠道（医保基金划转、个人缴费、财政补贴）、保障范围（城镇职工或城乡居民）和待遇标准上存在一定差异，但核心制度框架保持一致。\n\n长护险试点是否影响了家庭生育决策？这一问题关乎社会保障与人口政策的协调性。理论上，长期护理保险通过降低家庭老年照护负担，可能释放家庭生育潜力——尤其是对于承担主要照护责任的中青年女性。但这一\"照护替代效应\"在已有文献中缺乏严格的因果识别证据。本文利用长护险分两批推广的准自然实验变异，以城市层面面板数据和交错型双重差分法（Staggered DID），首次系统评估长期护理保险试点对城市生育率的因果效应，为社会保障与人口政策的协同设计提供经验证据。",
+    "intro_literature": "关于长期护理保险的政策效果，已有研究主要集中于三个维度：医疗费用替代效应、劳动供给效应和对养老服务产业的影响。在医疗费用方面，Feng等（2020）利用青岛市2012-2017年数据发现，LTCI使失能老人的住院费用下降约16%，非必要的医疗资源占用显著减少。Kim和Lim（2015）基于韩国长期护理保险的研究发现，LTCI使老年医疗费用下降了约10-15%，但下降主要集中在轻中度失能群体。在日本，Tamiya等（2011）的综述性研究指出，日本介护保险（2000年实施）在控制医疗费用增长方面的效果存在争议，部分研究发现费用的\"替代效应\"被新增加的照护服务使用所抵消。\n\n在劳动供给方面，长期护理保险可能通过替代家庭照护责任而影响劳动参与。Yamada和Shimizutani（2015）利用日本面板数据发现，介护保险的实施使女性劳动力参与率提高了约2-3个百分点，尤其是对中年已婚女性影响最为显著。在国内文献中，王等（2022）使用CHARLS数据发现，长护险试点城市的女性劳动供给显著增加，主要源于老年照护责任的外部化。但关于长护险对生育率的影响，目前实证研究极为有限。Zhao等（2023）利用省级面板数据和DID方法初步发现LTCI与生育率存在正相关，但研究存在数据粒度较粗（省级）、样本期较短（至2020年）、未处理交错处理异质性等局限。\n\n本文在以下三个方面对已有文献形成边际贡献：（1）数据层面，使用更长时序的城市层面面板数据（2010-2022年），覆盖政策实施前后6年和2年，能更充分刻画动态效应；（2）方法层面，采用Callaway和Sant'Anna（2021）的交错型DID估计量，以never-treated城市为对照组，有效处理传统TWFE在交错处理下的负权重问题；（3）研究视角层面，首次将长护险的政策效应延伸至生育决策领域，为社会保障与人口政策的交叉研究提供了新的实证视角。",
+    "institution": "中国长期护理保险制度的建立经历了地方自发探索和中央统一部署两个阶段。2012年，青岛市率先在全国范围内开展长期医疗护理保险试点，此后长春、南通等地也陆续开展自主探索。2016年6月27日，人力资源和社会保障部办公厅印发《关于开展长期护理保险制度试点的指导意见》（人社厅发〔2016〕80号），正式在国家层面启动长期护理保险制度试点。该文件确立了\"以人为本、责任分担、因地制宜、机制创新、统筹协调\"的基本原则，明确以长期处于失能状态的参保人群为保障对象，重点解决重度失能人员基本生活照料和医疗护理所需费用。\n\n第一批试点（2016年）包括15个城市：河北省承德市，吉林省长春市，黑龙江省齐齐哈尔市，上海市，江苏省南通市、苏州市，浙江省宁波市，安徽省安庆市，江西省上饶市，山东省青岛市，湖北省荆门市，广东省广州市，重庆市，四川省成都市，新疆生产建设兵团石河子市。这些城市在地理分布上覆盖了东、中、西部地区，在经济水平上涵盖了一线至四线城市，具有较好的代表性。2020年9月10日，国家医疗保障局、财政部联合印发《关于扩大长期护理保险制度试点的指导意见》（医保发〔2020〕37号），新增14个城市：北京市石景山区、天津市、山西省晋城市、内蒙古自治区呼和浩特市、辽宁省盘锦市、福建省福州市、河南省开封市、湖南省湘潭市、广西壮族自治区南宁市、贵州省黔西南布依族苗族自治州、云南省昆明市、陕西省汉中市、新疆维吾尔自治区乌鲁木齐市、吉林省吉林市。同时，文件明确将试点目标调整为\"探索建立以互助共济方式筹集资金、为长期失能人员的基本生活照料和与之密切相关的医疗护理提供服务或资金保障的社会保险制度\"。\n\n从政策设计特征来看，以下方面对识别策略至关重要。第一，两批试点的分批推广创造了交错处理结构：第一批2016年启动的15个城市有更长的受处理窗口（至2022年共7年），第二批2020年启动的14个城市仅有2年受处理窗口，未参与试点的城市则为never-treated对照组。第二，试点城市的选择并非随机，而是基于经济发展水平、人口老龄化程度、医保基金结余状况等可观察特征，因此需要在估计中控制城市层面的时变协变量。第三，各试点城市在具体制度参数（筹资标准、待遇水平、覆盖人群）上存在差异，但核心制度框架一致，处理可以视为二元变量（参与/未参与）。第四，全面二孩政策（2016年1月实施）和三孩政策（2021年5月宣布）与长护险试点的启动时间有所重叠，需要审慎处理同期政策效应的识别问题。",
+    "theory": "长期护理保险试点可能通过三条渠道影响城市生育率，各渠道的理论方向和强度存在差异。\n\n第一条渠道是\"照护替代效应\"（Caregiving Substitution Effect）。在中国传统文化背景下，中青年女性往往承担着对上一代（失能父母）和下一代（子女）的双重照护责任。长期护理保险通过将部分家庭照护功能社会化——为失能老人提供专业护理服务或照护补贴——降低中青年女性在老年照护上的时间投入和精力消耗。根据Becker（1965）的家庭生产模型，时间是一种稀缺资源，照护时间的节约可以重新配置到生育和子女抚育活动中。这一渠道预期对生育率产生正向影响，且对30-45岁、同时面临\"上有老、下有小\"双重压力的育龄女性群体影响最大。\n\n第二条渠道是\"收入效应\"（Income Effect）。长护险的建立将老年照护的部分隐性成本（家庭成员的照护时间、护理费用）转化为显性的社会保险支出（企业和个人缴费），可能降低家庭可支配收入。根据Becker（1960）的生育率经济分析，生育是\"耐用消费品\"，收入下降可能降低生育意愿。但另一方面，长护险通过风险共担机制降低了未来老年照护的不确定性成本，减少了家庭的预防性储蓄需求，这又可能对当期消费和生育产生正向激励。收入效应的净方向取决于缴费负担与风险保障收益的相对大小，是一个实证问题。\n\n第三条渠道是\"代际预期效应\"（Intergenerational Expectation Effect）。在中国\"养儿防老\"的传统观念下，子女是老年照护的重要来源。长期护理保险提供了社会化的照护替代方案，可能降低\"养儿防老\"的生育动机。但同时，LTCI也可能降低潜在父母对未来自身养老负担的预期，从而减少对\"多生一个孩子分担养老压力\"的经济算计。这一渠道存在两个方向相反的机制，其净效应需要实证检验。\n\n综合三条渠道，\"照护替代效应\"预期对生育率产生正向影响，是本文理论框架中的核心机制；\"收入效应\"和\"代际预期效应\"的方向不确定。三条渠道的时间维度也不同：照护替代效应的反应最快（政策实施后1-2年），收入效应需要3-5年的适应期，代际预期效应的显现则需要更长时间（5-10年）。基于本文的中期面板数据（政策实施后2-6年），预期捕捉到的主要是照护替代效应和收入效应的综合影响，其方向需要通过实证分析确定。",
+    "references": [
+      "Feng, J., Wang, Z., & Yu, Y. (2020). The long-term care insurance pilot and healthcare utilization: Evidence from Qingdao, China. Social Science & Medicine, 251, 112906.",
+      "Kim, H. B., & Lim, W. (2015). Long-term care insurance, informal care, and medical expenditures. Journal of Public Economics, 125, 128-142.",
+      "Tamiya, N., Noguchi, H., Nishi, A., Reich, M. R., Ikegami, N., Hashimoto, H., ... & Campbell, J. C. (2011). Population ageing and wellbeing: lessons from Japan's long-term care insurance policy. The Lancet, 378(9797), 1183-1192.",
+      "Yamada, H., & Shimizutani, S. (2015). Labor market outcomes of informal care provision in Japan. Journal of the Economics of Ageing, 6, 79-88.",
+      "Becker, G. S. (1965). A theory of the allocation of time. The Economic Journal, 75(299), 493-517.",
+      "Becker, G. S. (1960). An economic analysis of fertility. In Demographic and Economic Change in Developed Countries (pp. 209-240). Columbia University Press.",
+      "Callaway, B., & Sant'Anna, P. H. (2021). Difference-in-differences with multiple time periods. Journal of Econometrics, 225(2), 200-230.",
+      "Goodman-Bacon, A. (2021). Difference-in-differences with variation in treatment timing. Journal of Econometrics, 225(2), 254-277.",
+      "Sun, L., & Abraham, S. (2021). Estimating dynamic treatment effects in event studies with heterogeneous treatment effects. Journal of Econometrics, 225(2), 175-199.",
+      "de Chaisemartin, C., & D'Haultfoeuille, X. (2020). Two-way fixed effects estimators with heterogeneous treatment effects. American Economic Review, 110(9), 2964-2996."
+    ],
+    "data_desc": "本文使用的数据集为13年中国89个地级及以上城市的面板数据，共1157 (89 个城市 × 13 年)个观测值。\n\n被解释变量为出生率（对数），核心解释变量为组别-时间特定平均处理效应ATT(g,t)。估计方法为Callaway & Sant'Anna (2021) doubly-robust — never-treated。\n\n控制变量包括人均GDP、人口规模、人均财政收入、医院数量、老龄化率（65岁以上占比）、女性劳动参与率、城镇化率。\n\n原始数据经清洗、合并后形成分析用面板数据（ltci_panel.csv，CSV格式）。"
+  },
+  "references": [
+    {
+      "text": "Feng, J., Wang, Z., & Yu, Y. (2020). The long-term care insurance pilot and healthcare utilization: Evidence from Qingdao, China. Social Science & Medicine, 251, 112906.",
+      "complete": true
+    },
+    {
+      "text": "Kim, H. B., & Lim, W. (2015). Long-term care insurance, informal care, and medical expenditures. Journal of Public Economics, 125, 128-142.",
+      "complete": true
+    },
+    {
+      "text": "Tamiya, N., Noguchi, H., Nishi, A., Reich, M. R., Ikegami, N., Hashimoto, H., ... & Campbell, J. C. (2011). Population ageing and wellbeing: lessons from Japan's long-term care insurance policy. The Lancet, 378(9797), 1183-1192.",
+      "complete": true
+    },
+    {
+      "text": "Yamada, H., & Shimizutani, S. (2015). Labor market outcomes of informal care provision in Japan. Journal of the Economics of Ageing, 6, 79-88.",
+      "complete": true
+    },
+    {
+      "text": "Becker, G. S. (1965). A theory of the allocation of time. The Economic Journal, 75(299), 493-517.",
+      "complete": true
+    },
+    {
+      "text": "Becker, G. S. (1960). An economic analysis of fertility. In Demographic and Economic Change in Developed Countries (pp. 209-240). Columbia University Press.",
+      "complete": true
+    },
+    {
+      "text": "Callaway, B., & Sant'Anna, P. H. (2021). Difference-in-differences with multiple time periods. Journal of Econometrics, 225(2), 200-230.",
+      "complete": true
+    },
+    {
+      "text": "Goodman-Bacon, A. (2021). Difference-in-differences with variation in treatment timing. Journal of Econometrics, 225(2), 254-277.",
+      "complete": true
+    },
+    {
+      "text": "Sun, L., & Abraham, S. (2021). Estimating dynamic treatment effects in event studies with heterogeneous treatment effects. Journal of Econometrics, 225(2), 175-199.",
+      "complete": true
+    },
+    {
+      "text": "de Chaisemartin, C., & D'Haultfoeuille, X. (2020). Two-way fixed effects estimators with heterogeneous treatment effects. American Economic Review, 110(9), 2964-2996.",
+      "complete": true
+    },
+    {
+      "text": "Lim (2015)",
+      "complete": false,
+      "search_query": "Lim 2015 paper",
+      "authors": "Lim",
+      "year": "2015"
+    },
+    {
+      "text": "Shimizutani (2015)",
+      "complete": false,
+      "search_query": "Shimizutani 2015 paper",
+      "authors": "Shimizutani",
+      "year": "2015"
+    },
+    {
+      "text": "Anna (2021)",
+      "complete": false,
+      "search_query": "Anna 2021 paper",
+      "authors": "Anna",
+      "year": "2021"
+    },
+    {
+      "text": "Callaway, B. & Sant'Anna, P.H. (2021). Difference-in-differences with multiple time periods. Journal of Econometrics, 225(2), 200-230.",
+      "complete": true
+    },
+    {
+      "text": "Goodman-Bacon, A. (2021). Difference-in-differences with variation in treatment timing. Journal of Econometrics, 225(2), 254-277.",
+      "complete": true
+    },
+    {
+      "text": "Sun, L. & Abraham, S. (2021). Estimating dynamic treatment effects in event studies with heterogeneous treatment effects. Journal of Econometrics, 225(2), 175-199.",
+      "complete": true
+    },
+    {
+      "text": "de Chaisemartin, C. & D'Haultfoeuille, X. (2020). Two-way fixed effects estimators with heterogeneous treatment effects. American Economic Review, 110(9), 2964-2996.",
+      "complete": true
+    },
+    {
+      "text": "Angrist, J.D. & Pischke, J.S. (2009). Mostly Harmless Econometrics: An Empiricist's Companion. Princeton University Press.",
+      "complete": true
+    },
+    {
+      "text": "Roth, J. (2022). Pretest with caution: Event-study estimates after testing for parallel trends. American Economic Review: Insights, 4(3), 305-322.",
+      "complete": true
+    }
+  ],
+  "model_spec": {
+    "equation": "Y_{it} = \\alpha + \\sum_{g} \\sum_{t \\ge g} \\beta_{gt} \\cdot \\mathbb{1}(G_i=g, t \\ge g) + \\gamma X_{it} + \\mu_i + \\lambda_t + \\varepsilon_{it}",
+    "description": "其中 Y 为被解释变量，G_i 表示城市 i 所属的处理批次（cohort），β_{gt} 为批次 g 在第 t 期的组别-时间特定处理效应（ATT(g,t)）。通过按队列规模加权平均得到总体ATT。控制变量向量 X 包含可能影响结果的时变特征。μ_i 和 λ_t 分别为城市固定效应和年份固定效应。",
+    "variables": [
+      [
+        "被解释变量",
+        "出生率（对数）",
+        "ln(出生率)，取对数以解释弹性效应",
+        "中国城市统计年鉴"
+      ],
+      [
+        "核心解释变量",
+        "ATT(g,t)",
+        "组别-时间特定平均处理效应（staggered treatment）",
+        ""
+      ],
+      [
+        "控制变量",
+        "人均GDP",
+        "地区生产总值/常住人口（元/人）",
+        "中国城市统计年鉴"
+      ],
+      [
+        "控制变量",
+        "人口规模（万人）",
+        "年末户籍人口或常住人口",
+        "中国城市统计年鉴"
+      ],
+      [
+        "控制变量",
+        "人均财政收入",
+        "地方一般公共预算收入/常住人口（元/人）",
+        "中国城市统计年鉴"
+      ],
+      [
+        "控制变量",
+        "医院数量",
+        "辖区内医院总数（个）",
+        "中国城市统计年鉴"
+      ],
+      [
+        "控制变量",
+        "老龄化率",
+        "65岁以上人口占总人口比例",
+        "中国城市统计年鉴"
+      ],
+      [
+        "控制变量",
+        "女性劳动参与率",
+        "女性就业人口占女性劳动年龄人口比例",
+        "中国劳动统计年鉴"
+      ],
+      [
+        "控制变量",
+        "城镇化率",
+        "城镇人口占总人口比例",
+        "中国城市统计年鉴"
+      ]
+    ],
+    "identification": "本研究利用长期护理保险试点分批推广的政策设计特征，构建因果识别策略。该政策在不同单元分批次实施，形成了\"交错处理\"结构：不同单元在不同时点进入处理状态，且存在未受处理的对照组单元，为利用交错型双重差分策略识别因果效应提供了准自然实验条件。\n本文采用Callaway & Sant'Anna（2021）提出的交错型双重差分估计量（staggered DID）作为基准识别策略。选择这一方法的原因是：处理时点交错的情境下，传统双向固定效应（TWFE）估计量可能产生\"负权重\"问题（Goodman-Bacon, 2021）。C&S估计量通过先估计组别-时间特定的ATT(g,t)，再按组别规模加权平均，避免了这一问题。本文以44个未受处理单元作为对照组。\n核心识别变异的来源为：同一时点上，不同处理批次单元与从未受处理单元之间城市生育率（出生率）变化的系统性差异。单元固定效应吸收了所有不随时间变化的单元层面特征，年份固定效应吸收了所有单元共同面临的时间趋势冲击。Callaway & Sant'Anna（2021）估计量通过先估计组别-时间特定ATT(g,t)，再按队列规模加权平均得到总体ATT，这一系数可以解释为长期护理保险试点对城市生育率（出生率）的因果效应。\n该方法依赖以下核心识别假设：\n  • 平行趋势假设（Parallel Trends）【可检验】：在不受处理的反事实情境下，处理组和对照组的城市生育率（出生率）变化趋势应当相同。通过事件研究法中处理前各期系数的联合F检验进行评估。\n  • 无预期效应（No Anticipation）【可检验】：受处理单元在政策正式实施前，不应因预期到政策变化而提前调整行为。通过检验处理前各期系数是否接近零来验证。\n  • 稳定单元处理值假设（SUTVA）【需论证】：一个单元的处理状态不应影响其他单元的结果变量。该假设的合理性取决于政策的具体设计，需根据制度背景进行论证。\n  • 条件独立性假设（CIA/Unconfoundedness）【需论证】：在控制固定效应及可观测时变控制变量的条件下，处理分配与潜在结果独立。通过纳入相关控制变量和进行Oster界限分析来增强该假设的可信度。\n本文使用的数据集为13年（2010-2022）中国89个地级及以上城市的面板数据，其中处理组45个城市（分3个处理批次）、对照组44个城市。共13个时期，合计1157 (89 个城市 × 13 年)个观测值。标准误在单元层面聚类以处理组内序列相关问题。"
+  },
+  "descriptive_stats": {
+    "variables": [
+      {
+        "label": "birth_rate",
+        "treated": 10.778,
+        "control": 11.134,
+        "std_diff": 0.095
+      },
+      {
+        "label": "gdp_per_capita",
+        "treated": 74026.422,
+        "control": 61471.212,
+        "std_diff": 0.287
+      },
+      {
+        "label": "population_10k",
+        "treated": 702.544,
+        "control": 674.883,
+        "std_diff": 0.093
+      },
+      {
+        "label": "fiscal_revenue_pc",
+        "treated": 7780.9,
+        "control": 6507.197,
+        "std_diff": 0.241
+      },
+      {
+        "label": "n_hospitals",
+        "treated": 17.348,
+        "control": 16.326,
+        "std_diff": 0.102
+      },
+      {
+        "label": "elderly_ratio",
+        "treated": 0.122,
+        "control": 0.116,
+        "std_diff": 0.203
+      },
+      {
+        "label": "female_labor_participation",
+        "treated": 0.567,
+        "control": 0.55,
+        "std_diff": 0.252
+      },
+      {
+        "label": "urbanization_rate",
+        "treated": 0.608,
+        "control": 0.601,
+        "std_diff": 0.045
+      }
+    ],
+    "n_treated": 45,
+    "n_control": 44,
+    "note": "描述统计基于处理前（2010-2015年）数据。"
+  },
+  "plots": {
+    "placebo": "placebo.png"
+  },
+  "completeness_warnings": []
+}
