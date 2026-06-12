@@ -109,7 +109,7 @@ def run_stage3(state: dict, state_path: str, dry_run: bool = False) -> dict:
     if flags.get("everyone_treated_eventually"):
         cmd.append("--everyone-treated-eventually")
 
-    output_path = str(AUTO_DIR / f"stage3_{_safe_filename(policy)}.json")
+    output_path = str(get_output_dir(state_path) / f"stage3_{_safe_filename(policy)}.json")
     cmd.extend(["--output", output_path])
 
     if dry_run:
@@ -142,28 +142,29 @@ def run_stage6(state: dict, state_path: str, dry_run: bool = False) -> dict:
     policy = state["stages"].get("stage1", {}).get("policy", state.get("policy", ""))
     data_path = state.get("data_path") or str(MERGED_DIR / "panel.dta")
 
-    stage3_file = AUTO_DIR / f"stage3_{_safe_filename(policy)}.json"
+    stage3_file = get_output_dir(state_path) / f"stage3_{_safe_filename(policy)}.json"
     if not stage3_file.exists():
         # Try to find the stage3 output from stage3 data
         s3_output_file = s3.get("output_file", "")
         if s3_output_file and Path(s3_output_file).exists():
             stage3_file = Path(s3_output_file)
 
+    out_dir = get_output_dir(state_path)
     cmd = [
         sys.executable, str(SCRIPTS_DIR / "stage6_confirm.py"),
         "--stage3", str(stage3_file),
         "--data", _resolve_data_path(data_path),
-        "--output", str(AUTO_DIR / "stage6_confirmation.json"),
+        "--output", str(out_dir / "stage6_confirmation.json"),
     ]
 
     # Pass validation report if available
-    validation_report = AUTO_DIR / "validation_report.json"
+    validation_report = out_dir / "validation_report.json"
     if validation_report.exists():
         cmd.extend(["--validate-report", str(validation_report)])
 
     if dry_run:
         return {"status": "dry_run", "command": " ".join(cmd),
-                "output": str(AUTO_DIR / "stage6_confirmation.json")}
+                "output": str(out_dir / "stage6_confirmation.json")}
 
     print(f"\n{'='*60}")
     print("Stage 6: Final Method Confirmation")
@@ -177,7 +178,7 @@ def run_stage6(state: dict, state_path: str, dry_run: bool = False) -> dict:
         return {"status": "error", "stderr": result.stderr}
 
     # Load the JSON output
-    out_path = AUTO_DIR / "stage6_confirmation.json"
+    out_path = out_dir / "stage6_confirmation.json"
     if out_path.exists():
         with open(out_path, encoding="utf-8") as f:
             stage6_output = json.load(f)
@@ -201,8 +202,160 @@ def _resolve_data_path(data_path: str) -> str:
     return str(p.resolve())
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# Stage 7 method dispatch table
+# ═══════════════════════════════════════════════════════════════════════
+
+def _build_cs_cmd(data_path, spec):
+    """Callaway & Sant'Anna staggered DID."""
+    cmd = [
+        sys.executable, str(SCRIPTS_DIR / "run_staggered_did.py"),
+        "--data", data_path,
+        "--outcome", spec["outcome"],
+        "--entity", spec.get("entity_col", "city_id"),
+        "--time", spec.get("time_col", "year"),
+        "--first-treated", spec.get("first_treated_col", "first_treated"),
+        "--method", spec.get("method", "cs"),
+        "--control", spec.get("control_type", "never-treated"),
+    ]
+    controls = spec.get("covariates", [])
+    if controls:
+        cmd.extend(["--controls"] + controls)
+    return cmd
+
+
+def _build_twfe_cmd(data_path, spec):
+    """Standard TWFE DID."""
+    cmd = [
+        sys.executable, str(SCRIPTS_DIR / "run_did.py"),
+        "--data", data_path,
+        "--outcome", spec["outcome"],
+        "--entity", spec.get("entity_col", "city_id"),
+        "--time", spec.get("time_col", "year"),
+        "--treated", spec.get("treated_col", "treated"),
+        "--post", spec.get("post_col", "post"),
+    ]
+    controls = spec.get("covariates", [])
+    if controls:
+        cmd.extend(["--controls"] + controls)
+        cmd.append("--baseline")
+    return cmd
+
+
+def _build_rdd_cmd(data_path, spec):
+    """Regression discontinuity."""
+    return [
+        sys.executable, str(SCRIPTS_DIR / "run_rdd.py"),
+        "--data", data_path,
+        "--outcome", spec["outcome"],
+        "--running-var", spec.get("running_var", "running_var"),
+        "--cutoff", str(spec.get("cutoff", 0)),
+        "--type", spec.get("rdd_type", "sharp"),
+    ]
+
+
+def _build_iv_cmd(data_path, spec):
+    """Instrumental variables."""
+    instruments = spec.get("instruments", [])
+    cmd = [
+        sys.executable, str(SCRIPTS_DIR / "run_iv.py"),
+        "--data", data_path,
+        "--outcome", spec["outcome"],
+        "--treatment", spec.get("treatment_var", "treatment"),
+        "--instruments"] + instruments
+    controls = spec.get("covariates", [])
+    if controls:
+        cmd.extend(["--controls"] + controls)
+    return cmd
+
+
+def _build_sdid_cmd(data_path, spec):
+    """Synthetic difference-in-differences."""
+    cmd = [
+        sys.executable, str(SCRIPTS_DIR / "run_synthetic_did.py"),
+        "--data", data_path,
+        "--outcome", spec["outcome"],
+        "--entity", spec.get("entity_col", "city_id"),
+        "--time", spec.get("time_col", "year"),
+        "--first-treated", str(spec.get("first_treated", 0)),
+    ]
+    treated_unit = spec.get("treated_unit", "")
+    if treated_unit:
+        cmd.extend(["--treated-unit", str(treated_unit)])
+    return cmd
+
+
+def _build_scm_cmd(data_path, spec):
+    """Synthetic control method."""
+    return [
+        sys.executable, str(SCRIPTS_DIR / "run_scm.py"),
+        "--data", data_path,
+        "--outcome", spec["outcome"],
+        "--entity", spec.get("entity_col", "city_id"),
+        "--time", spec.get("time_col", "year"),
+        "--treated-unit", str(spec.get("treated_unit", "")),
+        "--first-treated", str(spec.get("first_treated", 0)),
+    ]
+
+
+def _build_dml_cmd(data_path, spec):
+    """Double/debiased machine learning."""
+    cmd = [
+        sys.executable, str(SCRIPTS_DIR / "run_dml.py"),
+        "--data", data_path,
+        "--outcome", spec["outcome"],
+        "--treatment", spec.get("treatment_var", "treatment"),
+    ]
+    controls = spec.get("covariates", [])
+    if controls:
+        cmd.extend(["--controls"] + controls)
+    return cmd
+
+
+# Method code → (script_name, command_builder)
+METHOD_DISPATCH = {
+    "cs":             ("run_staggered_did.py",  _build_cs_cmd),
+    "twfe":           ("run_did.py",            _build_twfe_cmd),
+    "rdd":            ("run_rdd.py",            _build_rdd_cmd),
+    "iv":             ("run_iv.py",             _build_iv_cmd),
+    "sdid":           ("run_synthetic_did.py",  _build_sdid_cmd),
+    "scm":            ("run_scm.py",            _build_scm_cmd),
+    "dml":            ("run_dml.py",            _build_dml_cmd),
+    "causal_forest":  ("run_causal_forest.py",  _build_dml_cmd),
+}
+
+# Methods that have no estimation script — will produce an explicit error
+NO_SCRIPT_METHODS = {"ddd", "intensity_did", "psm", "randomization", "unknown"}
+
+
+def _infer_method_code(final_method: str) -> str:
+    """Fallback: infer method code from final_method text when spec.method is missing."""
+    ml = final_method.lower()
+    if any(k in ml for k in ("callaway", "staggered", "sun & abraham")):
+        return "cs"
+    if "triple diff" in ml or "ddd" in ml:
+        return "ddd"
+    if "intensity" in ml:
+        return "intensity_did"
+    if "rdd" in ml:
+        return "rdd"
+    if "synthetic did" in ml or "synthetic difference" in ml:
+        return "sdid"
+    if "scm" in ml or "synthetic control" in ml:
+        return "scm"
+    if any(k in ml for k in ("iv", "2sls", "liml")):
+        return "iv"
+    if "dml" in ml:
+        return "dml"
+    if "causal forest" in ml:
+        return "causal_forest"
+    if any(k in ml for k in ("did", "twfe")):
+        return "twfe"
+    return "unknown"
+
+
 def run_stage7(state: dict, state_path: str, dry_run: bool = False) -> dict:
-    """Stage 7: Estimation — run the chosen method."""
+    """Stage 7: Estimation — dispatch on spec.method, validate output matches."""
     s6 = state["stages"].get("stage6", {})
     s1 = state["stages"].get("stage1", {})
     final_method = s6.get("final_method", "")
@@ -215,96 +368,40 @@ def run_stage7(state: dict, state_path: str, dry_run: bool = False) -> dict:
 
     results = {}
 
-    # Determine which estimation script to run
-    if "callaway" in final_method.lower() or "staggered" in final_method.lower():
-        cmd = [
-            sys.executable, str(SCRIPTS_DIR / "run_staggered_did.py"),
-            "--data", data_path,
-            "--outcome", outcome,
-            "--entity", entity,
-            "--time", time_col,
-            "--first-treated", spec.get("first_treated_col", s6.get("first_treated_col", "first_treated")),
-            "--method", spec.get("method", "cs"),
-            "--control", spec.get("control_type", s6.get("control_type", "never-treated")),
-        ]
-        controls = spec.get("covariates", s6.get("covariates", []))
-        if controls:
-            cmd.extend(["--controls"] + controls)
+    # --- Resolve method code ---
+    method_code = spec.get("method")
+    if not method_code:
+        method_code = _infer_method_code(final_method)
+        print(f"WARNING: spec.method missing. Inferred '{method_code}' from "
+              f"final_method text. Re-run Stage 6 to get a proper spec.method.")
 
-    elif "did" in final_method.lower() or "twfe" in final_method.lower():
-        cmd = [
-            sys.executable, str(SCRIPTS_DIR / "run_did.py"),
-            "--data", data_path,
-            "--outcome", outcome,
-            "--entity", entity,
-            "--time", time_col,
-            "--treated", spec.get("treated_col", s6.get("treated_col", "treated")),
-            "--post", spec.get("post_col", s6.get("post_col", "post")),
-        ]
-        controls = spec.get("covariates", s6.get("covariates", []))
-        if controls:
-            cmd.extend(["--controls"] + controls)
-            cmd.append("--baseline")
+    if method_code in NO_SCRIPT_METHODS:
+        return {"status": "error",
+                "message": f"Method '{method_code}' has no estimation script. "
+                           f"Stage 6 should have set no_estimation_script=True."}
 
-    elif "rdd" in final_method.lower():
-        cmd = [
-            sys.executable, str(SCRIPTS_DIR / "run_rdd.py"),
-            "--data", data_path,
-            "--outcome", outcome,
-            "--running-var", spec.get("running_var", s6.get("running_var", "running_var")),
-            "--cutoff", str(spec.get("cutoff", s6.get("cutoff", 0))),
-            "--type", spec.get("rdd_type", s6.get("rdd_type", "sharp")),
-        ]
+    if method_code not in METHOD_DISPATCH:
+        return {"status": "error",
+                "message": f"Unknown method code '{method_code}'. "
+                           f"Stage 6 specification may be corrupted."}
 
-    elif "iv" in final_method.lower() or "2sls" in final_method.lower():
-        instruments = spec.get("instruments", s6.get("instruments", []))
-        cmd = [
-            sys.executable, str(SCRIPTS_DIR / "run_iv.py"),
-            "--data", data_path,
-            "--outcome", outcome,
-            "--treatment", spec.get("treatment_var", s6.get("treatment_var", "treatment")),
-            "--instruments"] + instruments
-        controls = spec.get("covariates", s6.get("covariates", []))
-        if controls:
-            cmd.extend(["--controls"] + controls)
+    script_name, cmd_builder = METHOD_DISPATCH[method_code]
 
-    elif "synthetic did" in final_method.lower() or "synthetic difference" in final_method.lower():
-        cmd = [
-            sys.executable, str(SCRIPTS_DIR / "run_synthetic_did.py"),
-            "--data", data_path,
-            "--outcome", outcome,
-            "--entity", entity,
-            "--time", time_col,
-            "--first-treated", str(spec.get("first_treated", s6.get("first_treated", 0))),
-        ]
-        treated_unit = spec.get("treated_unit", s6.get("treated_unit", ""))
-        if treated_unit:
-            cmd.extend(["--treated-unit", str(treated_unit)])
-
-    elif "scm" in final_method.lower() or "synthetic control" in final_method.lower():
-        cmd = [
-            sys.executable, str(SCRIPTS_DIR / "run_scm.py"),
-            "--data", data_path,
-            "--outcome", outcome,
-            "--entity", entity,
-            "--time", time_col,
-            "--treated-unit", str(spec.get("treated_unit", s6.get("treated_unit", ""))),
-            "--first-treated", str(spec.get("first_treated", s6.get("first_treated", 0))),
-        ]
-
-    else:
-        return {"status": "error", "message": f"Unknown method: {final_method}"}
-
-    output_path = str(AUTO_DIR / "stage7_main_result.json")
+    # --- Build command ---
+    cmd = cmd_builder(data_path, spec)
+    output_path = str(get_output_dir(state_path) / "stage7_main_result.json")
     cmd.extend(["--output", output_path])
 
     if dry_run:
-        return {"status": "dry_run", "command": " ".join(cmd), "output": output_path}
+        return {"status": "dry_run",
+                "method_code": method_code,
+                "command": " ".join(cmd),
+                "output": output_path}
 
     print(f"\n{'='*60}")
     print("Stage 7: Estimation")
     print(f"{'='*60}")
-    print(f"Method: {final_method}")
+    print(f"Method code: {method_code} → {script_name}")
     print(f"Running: {' '.join(cmd)}")
 
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -313,29 +410,71 @@ def run_stage7(state: dict, state_path: str, dry_run: bool = False) -> dict:
         print(f"Error: {result.stderr}")
         return {"status": "error", "stderr": result.stderr}
 
-    results["main_result"] = {"output_file": output_path}
+    results["main_result"] = {"output_file": output_path, "method_code": method_code}
     results["status"] = "completed"
 
-    # Also run event study
+    # --- Validate: does the output match the expected method? ---
+    _validate_stage7_output(output_path, method_code)
+
+    # --- Also run event study (for methods that support it) ---
+    _run_event_study(state_path, data_path, outcome, entity, time_col, spec, s6, results)
+
+    mark_stage_complete(state, 7, results, state_path)
+    return results
+
+
+def _validate_stage7_output(output_path: str, expected_code: str):
+    """Check that the estimation output's method matches what was expected."""
+    if not Path(output_path).exists():
+        return
     try:
+        with open(output_path, encoding="utf-8") as f:
+            out = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"WARNING: Could not read stage7 output for validation: {e}")
+        return
+
+    # Normalize: different scripts use different keys for the method name
+    actual = (out.get("method") or out.get("type") or "").lower()
+    if not actual:
+        return  # SCM / Synthetic DID don't report method — skip validation
+
+    # Expected method name patterns for each code
+    EXPECTED_PATTERNS = {
+        "cs":   ["callaway", "staggered", "sun & abraham"],
+        "twfe": ["did", "twfe", "difference-in-differences"],
+        "rdd":  ["rdd", "regression discontinuity"],
+        "iv":   ["2sls", "liml", "instrumental"],
+        "dml":  ["double", "debiased", "dml"],
+    }
+    expected = EXPECTED_PATTERNS.get(expected_code, [expected_code])
+    if not any(p in actual for p in expected):
+        print(f"WARNING: Stage 7 output method '{actual}' does not match "
+              f"expected code '{expected_code}'. Output may be from wrong estimator.")
+
+
+def _run_event_study(state_path, data_path, outcome, entity, time_col, spec, s6, results):
+    """Run event study as a companion to the main estimation."""
+    if spec.get("method") in NO_SCRIPT_METHODS:
+        return
+    try:
+        event_out_dir = get_output_dir(state_path)
         event_cmd = [
             sys.executable, str(SCRIPTS_DIR / "run_event_study.py"),
             "--data", data_path,
             "--outcome", outcome,
             "--entity", entity,
             "--time", time_col,
-            "--first-treated", spec.get("first_treated_col", s6.get("first_treated_col", "first_treated")),
-            "--plot", str(AUTO_DIR / "event_study.png"),
-            "--output", str(AUTO_DIR / "stage7_event_study.json"),
+            "--first-treated", spec.get("first_treated_col",
+                                        s6.get("first_treated_col", "first_treated")),
+            "--plot", str(event_out_dir / "event_study.png"),
+            "--output", str(event_out_dir / "stage7_event_study.json"),
         ]
         event_result = subprocess.run(event_cmd, capture_output=True, text=True)
         print(event_result.stdout)
-        results["event_study"] = {"output_file": str(AUTO_DIR / "stage7_event_study.json")}
+        results["event_study"] = {"output_file": str(event_out_dir / "stage7_event_study.json")}
     except Exception as e:
         print(f"Event study warning: {e}")
-
-    mark_stage_complete(state, 7, results, state_path)
-    return results
 
 
 def run_stage8(state: dict, state_path: str, dry_run: bool = False) -> dict:
@@ -350,11 +489,12 @@ def run_stage8(state: dict, state_path: str, dry_run: bool = False) -> dict:
     time_col = spec.get("time_col", s6.get("time_col", "year"))
 
     results = {}
-    placebo_file = str(AUTO_DIR / "stage8_placebo.json")
-    bacon_file = str(AUTO_DIR / "stage8_bacon.json")
-    sens_file = str(AUTO_DIR / "stage8_sensitivity.json")
-    alt_file = str(AUTO_DIR / "stage8_alt_windows.json")
-    summary_file = str(AUTO_DIR / "stage8_summary.json")
+    out_dir = get_output_dir(state_path)
+    placebo_file = str(out_dir / "stage8_placebo.json")
+    bacon_file = str(out_dir / "stage8_bacon.json")
+    sens_file = str(out_dir / "stage8_sensitivity.json")
+    alt_file = str(out_dir / "stage8_alt_windows.json")
+    summary_file = str(out_dir / "stage8_summary.json")
 
     if dry_run:
         return {"status": "dry_run",
@@ -374,7 +514,7 @@ def run_stage8(state: dict, state_path: str, dry_run: bool = False) -> dict:
             "--treated", s6.get("treated_col", "treated"),
             "--post", s6.get("post_col", "post"),
             "--n-sim", "500",
-            "--plot", str(AUTO_DIR / "placebo.png"),
+            "--plot", str(out_dir / "placebo.png"),
             "--output", placebo_file,
         ]
         if s6.get("first_treated_col"):
@@ -485,13 +625,14 @@ def run_stage9(state: dict, state_path: str, dry_run: bool = False) -> dict:
     if s3.get("output_file") and Path(s3["output_file"]).exists():
         stage3_file = s3["output_file"]
     # Second try: standard naming pattern
+    out_dir = get_output_dir(state_path)
     if not stage3_file:
-        candidate = str(AUTO_DIR / f"stage3_{_safe_filename(policy)}.json")
+        candidate = str(out_dir / f"stage3_{_safe_filename(policy)}.json")
         if Path(candidate).exists():
             stage3_file = candidate
     # Third try: glob
     if not stage3_file:
-        candidates = sorted(AUTO_DIR.glob("stage3_*.json"))
+        candidates = sorted(out_dir.glob("stage3_*.json"))
         if candidates:
             stage3_file = str(candidates[0])
 
@@ -508,11 +649,12 @@ def run_stage9(state: dict, state_path: str, dry_run: bool = False) -> dict:
         sys.executable, str(SCRIPTS_DIR / "output_report.py"),
         "--policy", policy,
         "--outcome", outcome,
-        "--stage3", stage3_file,
-        "--output", report_data_path,
     ]
+    if stage3_file:
+        extract_cmd.extend(["--stage3", stage3_file])
+    extract_cmd.extend(["--output", report_data_path])
 
-    stage6_file = s6.get("output_file", str(AUTO_DIR / "stage6_confirmation.json"))
+    stage6_file = s6.get("output_file", str(out_dir / "stage6_confirmation.json"))
     if Path(stage6_file).exists():
         extract_cmd.extend(["--stage6", stage6_file])
 
@@ -525,6 +667,8 @@ def run_stage9(state: dict, state_path: str, dry_run: bool = False) -> dict:
         extract_cmd.extend(["--stage8-placebo", s8["placebo"]["output_file"]])
     if s8.get("summary", {}).get("output_file"):
         extract_cmd.extend(["--stage8-summary", s8["summary"]["output_file"]])
+    if s8.get("alt_windows", {}).get("output_file"):
+        extract_cmd.extend(["--stage8-alt-windows", s8["alt_windows"]["output_file"]])
 
     # Pass panel data path for descriptive stats computation
     data_path = state.get("data_path", "")
@@ -536,8 +680,7 @@ def run_stage9(state: dict, state_path: str, dry_run: bool = False) -> dict:
     s5 = state["stages"].get("stage5", {})
     data_status = s5.get("data_status", None)
     if data_status:
-        import tempfile
-        tmp_status = Path(tempfile.gettempdir()) / f"stage5_data_status_{_safe_filename(policy)}.json"
+        tmp_status = out_dir / "stage5_data_status.json"
         tmp_status.write_text(json.dumps(data_status, ensure_ascii=False, indent=2), encoding="utf-8")
         extract_cmd.extend(["--data-status", str(tmp_status)])
 
@@ -549,12 +692,12 @@ def run_stage9(state: dict, state_path: str, dry_run: bool = False) -> dict:
         extract_cmd.extend(["--n-obs", str(data_meta["n_obs"])])
 
     # Stage 2 narrative sections
-    stage2_sections_file = AUTO_DIR / "stage2_sections.json"
+    stage2_sections_file = out_dir / "stage2_sections.json"
     if stage2_sections_file.exists():
         extract_cmd.extend(["--stage2-sections", str(stage2_sections_file)])
 
     # Event study (from Stage 7) — search with glob, not hardcoded names
-    event_study_file = AUTO_DIR / "stage7_event_study.json"
+    event_study_file = out_dir / "stage7_event_study.json"
     if not event_study_file.exists():
         # Also look for event study from s7's own records
         if s7.get("event_study", {}).get("output_file"):
@@ -563,21 +706,17 @@ def run_stage9(state: dict, state_path: str, dry_run: bool = False) -> dict:
                 event_study_file = es_candidate
     if not event_study_file.exists():
         # Generic glob for any event study JSON
-        es_candidates = sorted(AUTO_DIR.glob("*event_study*.json"))
+        es_candidates = sorted(out_dir.glob("*event_study*.json"))
         if not es_candidates:
-            es_candidates = sorted(AUTO_DIR.glob("*es_*.json"))
+            es_candidates = sorted(out_dir.glob("*es_*.json"))
         if es_candidates:
             event_study_file = es_candidates[0]
     if event_study_file.exists():
         extract_cmd.extend(["--event-study", str(event_study_file)])
 
-    # Step 2: Render Markdown + XeLaTeX
     safe_policy = _safe_filename(policy)
     md_dir = run_dir / "markdown"
     tex_dir = run_dir / "latex"
-    md_dir.mkdir(parents=True, exist_ok=True)
-    tex_dir.mkdir(parents=True, exist_ok=True)
-
     md_path = str(md_dir / f"{safe_policy}_report.md")
     tex_path = str(tex_dir / f"{safe_policy}_report.tex")
 
@@ -607,6 +746,23 @@ def run_stage9(state: dict, state_path: str, dry_run: bool = False) -> dict:
         print(f"Extraction error: {result1.stderr}")
         return {"status": "error", "step": "extract", "stderr": result1.stderr}
 
+    # Copy plot files to output directories and update paths
+    md_dir.mkdir(parents=True, exist_ok=True)
+    tex_dir.mkdir(parents=True, exist_ok=True)
+    import shutil
+    es_plot_src = out_dir / "event_study.png"
+    placebo_plot_src = out_dir / "placebo.png"
+    for src in [es_plot_src, placebo_plot_src]:
+        if src.exists():
+            shutil.copy2(str(src), str(md_dir / src.name))
+            shutil.copy2(str(src), str(tex_dir / src.name))
+    rd = json.loads(Path(report_data_path).read_text(encoding="utf-8"))
+    if rd.get("event_study", {}).get("plot") and es_plot_src.exists():
+        rd["event_study"]["plot"] = es_plot_src.name
+    if rd.get("plots", {}).get("placebo") and placebo_plot_src.exists():
+        rd["plots"]["placebo"] = placebo_plot_src.name
+    Path(report_data_path).write_text(json.dumps(rd, ensure_ascii=False, indent=2), encoding="utf-8")
+
     # Run rendering
     print(f"Rendering: {' '.join(render_cmd)}")
     result2 = subprocess.run(render_cmd, capture_output=True, text=True,
@@ -635,6 +791,16 @@ def run_stage9(state: dict, state_path: str, dry_run: bool = False) -> dict:
 def _safe_filename(name: str) -> str:
     """Convert a policy name to a safe filename component."""
     return "".join(c if c.isalnum() or c in "_-" else "_" for c in name).lower()
+
+
+def get_output_dir(state_path):
+    """Derive per-analysis output directory from the state file path.
+
+    --state ltci_state.json -> data/auto/ltci_state/
+    """
+    out_dir = AUTO_DIR / Path(state_path).stem
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir
 
 
 def _find_or_create_subject_dir(policy_name: str, base_dir: Path) -> Path:
@@ -797,8 +963,9 @@ Examples:
             run_stage3(state, args.state, dry_run=args.dry_run)
 
         if stage == 4:
+            out_dir = get_output_dir(args.state)
             policy = state["stages"].get("stage1", {}).get("policy", state.get("policy", ""))
-            stage3_file = AUTO_DIR / f"stage3_{_safe_filename(policy)}.json"
+            stage3_file = out_dir / f"stage3_{_safe_filename(policy)}.json"
             if not stage3_file.exists():
                 s3 = state["stages"].get("stage3", {})
                 if s3.get("output_file") and Path(s3["output_file"]).exists():
@@ -807,7 +974,7 @@ Examples:
                 cmd = [
                     sys.executable, str(SCRIPTS_DIR / "stage4_requirements.py"),
                     "--stage3", str(stage3_file),
-                    "--output", str(AUTO_DIR / "stage4_requirements.json"),
+                    "--output", str(out_dir / "stage4_requirements.json"),
                     "--text",
                 ]
                 if not args.dry_run:
@@ -821,7 +988,7 @@ Examples:
                         print(f"Error: {result.stderr}")
                     else:
                         # Load and store in state
-                        req_path = AUTO_DIR / "stage4_requirements.json"
+                        req_path = out_dir / "stage4_requirements.json"
                         if req_path.exists():
                             with open(req_path, encoding="utf-8") as f:
                                 stage4_output = json.load(f)
@@ -846,7 +1013,7 @@ Examples:
             print(f"{'='*60}")
 
             # Read Stage 4 requirements for auto-fetch
-            req_path = AUTO_DIR / "stage4_requirements.json"
+            req_path = get_output_dir(args.state) / "stage4_requirements.json"
             if req_path.exists():
                 with open(req_path, encoding="utf-8") as f:
                     req = json.load(f)

@@ -32,8 +32,12 @@ except ImportError:
 
 
 def load_json(path: str) -> dict:
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"WARNING: Failed to load {path}: {e}")
+        return {}
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -106,7 +110,7 @@ def _effect_magnitude(result: dict, coef: float) -> str:
 def _treatment_var_label(mechanism: str) -> str:
     """Return the correct treatment variable label for a given mechanism."""
     labels = {
-        "staggered_policy_shock": "Treated × Post (staggered)",
+        "staggered_policy_shock": "ATT(g,t) — 组别-时间特定平均处理效应",
         "single_policy_shock": "Treated × Post",
         "threshold_rule": "Above Threshold",
         "time_varying_unobservables": "Treatment (endogenous)",
@@ -135,7 +139,8 @@ def _has_time_fe(mechanism: str) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _normalize_checks(stage8: dict, stage8_placebo: dict = None,
-                       stage8_summary: dict = None) -> list[dict]:
+                       stage8_summary: dict = None,
+                       stage8_alt_windows: dict = None) -> list[dict]:
     # If we have the consolidated summary, use it directly
     if stage8_summary:
         checks = stage8_summary.get("checks", [])
@@ -169,6 +174,19 @@ def _normalize_checks(stage8: dict, stage8_placebo: dict = None,
                 f"placebo distribution (p={'<0.001' if p_val < 0.001 else f'{p_val:.4f}'})."
             ),
         })
+    if stage8_alt_windows:
+        for entry in stage8_alt_windows.get("windows", stage8_alt_windows.get("results", [])):
+            window_name = entry.get("window", entry.get("name", "Unknown window"))
+            coef = entry.get("coefficient", entry.get("coef", None))
+            passed = coef is not None
+            checks.append({
+                "name": f"Alternative window: {window_name}",
+                "passed": passed,
+                "interpretation": (
+                    f"Coefficient = {coef:.4f}" if coef is not None
+                    else "Window estimation failed"
+                ),
+            })
     return checks
 
 
@@ -244,9 +262,15 @@ def _build_data_desc(data_path, data_meta, main_result, data_status, data_span):
     else:
         # Fallback without data_status — build a basic description
         outcome_label = main_result.get("outcome", "被解释变量")
-        outcome_name = outcome_label if isinstance(outcome_label, str) else "被解释变量"
+        outcome_name_raw = outcome_label if isinstance(outcome_label, str) else "被解释变量"
+        # Use CTRL_VARDEFS lookup for proper Chinese label
+        outcome_name = CTRL_VARDEFS.get(str(outcome_name_raw), (str(outcome_name_raw),))[0]
         method = main_result.get("method", "双重差分")
-        parts.append(f"被解释变量为{outcome_name}，核心解释变量为处理变量与时间虚拟变量的交互项。估计方法为{method}。")
+        is_cs = "Callaway" in method or "Sant'Anna" in method
+        if is_cs:
+            parts.append(f"被解释变量为{outcome_name}，核心解释变量为组别-时间特定平均处理效应ATT(g,t)。估计方法为{method}。")
+        else:
+            parts.append(f"被解释变量为{outcome_name}，核心解释变量为处理变量与时间虚拟变量的交互项。估计方法为{method}。")
         controls = main_result.get("controls", [])
         ctrl_labels = {
             "log_gdp_pc": "人均GDP（对数）", "log_population": "人口规模（对数）",
@@ -605,13 +629,23 @@ def _extract_references(sec: dict) -> list[dict]:
                     "year": year,
                 })
 
-    # Add explicitly listed references from stage2_sections
+    # Add explicitly listed references, remove incomplete regex duplicates
     explicit_refs = sec.get("references", [])
-    if isinstance(explicit_refs, list):
+    if isinstance(explicit_refs, list) and explicit_refs:
+        # Extract author-year from each explicit ref to dedup against regex ones
+        explicit_keys = set()
         for er in explicit_refs:
-            if er and er not in seen:
-                seen.add(er)
-                refs.append({"text": er, "complete": True})
+            m = re.search(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*).*?\((\d{4})\)', er)
+            if m:
+                explicit_keys.add(f"{m.group(1)} ({m.group(2)})")
+        # Remove regex-extracted incomplete refs that match explicit refs
+        refs = [r for r in refs if not (
+            not r.get("complete", True) and
+            any(r.get("text", "").startswith(k) for k in explicit_keys)
+        )]
+        # Prepend explicit refs
+        for er in reversed(explicit_refs):
+            refs.insert(0, {"text": er, "complete": True})
 
     # Add canonical method references not cited in text but essential
     canonical_must_include = [
@@ -632,6 +666,27 @@ def _extract_references(sec: dict) -> list[dict]:
 # Structured data builder
 # ═══════════════════════════════════════════════════════════════════════════
 
+# Variable name → (Chinese label, definition, data source)
+CTRL_VARDEFS = {
+    # Outcome variables
+    "birth_rate":            ("出生率", "每千人口出生人数（‰）", "中国城市统计年鉴"),
+    "log_birth_rate":        ("出生率（对数）", "ln(出生率)，取对数以解释弹性效应", "中国城市统计年鉴"),
+    "log_so2":               ("SO₂排放（对数）", "ln(工业SO₂排放量/万吨)", "中国环境统计年鉴"),
+    # Control variables
+    "gdp_per_capita":        ("人均GDP", "地区生产总值/常住人口（元/人）", "中国城市统计年鉴"),
+    "population_10k":        ("人口规模（万人）", "年末户籍人口或常住人口", "中国城市统计年鉴"),
+    "elderly_ratio":         ("老龄化率", "65岁以上人口占总人口比例", "中国城市统计年鉴"),
+    "urbanization_rate":     ("城镇化率", "城镇人口占总人口比例", "中国城市统计年鉴"),
+    "fiscal_revenue_pc":     ("人均财政收入", "地方一般公共预算收入/常住人口（元/人）", "中国城市统计年鉴"),
+    "female_labor_participation": ("女性劳动参与率", "女性就业人口占女性劳动年龄人口比例", "中国劳动统计年鉴"),
+    "industrial_rate":       ("工业化率", "工业增加值占GDP比例", "中国城市统计年鉴"),
+    "n_hospitals":           ("医院数量", "辖区内医院总数（个）", "中国城市统计年鉴"),
+    "energy_consumption":    ("能源消耗", "单位GDP能耗（吨标准煤/万元）", "中国能源统计年鉴"),
+    "log_gdp_pc":            ("人均GDP（对数）", "ln(地区生产总值/常住人口)", "中国城市统计年鉴"),
+    "log_population":        ("人口规模（对数）", "ln(年末常住人口)", "中国城市统计年鉴"),
+}
+
+
 def build_report_data(
     policy: str,
     outcome: str,
@@ -641,6 +696,7 @@ def build_report_data(
     stage8: dict = None,
     stage8_placebo: dict = None,
     stage8_summary: dict = None,
+    stage8_alt_windows: dict = None,
     data_source: str = "",
     data_span: str = "",
     n_obs: str = "",
@@ -695,7 +751,7 @@ def build_report_data(
             periods = r.get("n_periods", 0) or r.get("n_total_periods", 0)
             obs_str = f"{n}"
             if entities and periods:
-                obs_str += f" ({entities} entities × {periods} periods)"
+                obs_str += f" ({entities} 个城市 × {periods} 年)"
 
     # Try to extract a meaningful data source description
     src_label = data_source
@@ -777,7 +833,7 @@ def build_report_data(
                 periods = last_spec.get("n_periods", 0)
                 obs_str = str(n) if n else ""
                 if entities and periods:
-                    obs_str += f" ({entities} entities × {periods} periods)"
+                    obs_str += f" ({entities} 个城市 × {periods} 年)"
                 data["data_meta"]["n_obs"] = obs_str
             elif main_result.get("n_obs"):
                 data["data_meta"]["n_obs"] = str(main_result["n_obs"])
@@ -835,7 +891,7 @@ def build_report_data(
     data["fallback_attempts"] = stage6.get("fallback_attempts", []) if stage6 else []
 
     # ── Robustness ──
-    data["robustness"] = _normalize_checks(stage8, stage8_placebo, stage8_summary)
+    data["robustness"] = _normalize_checks(stage8, stage8_placebo, stage8_summary, stage8_alt_windows)
 
     # ── Data quality ──
     data["data_quality"] = stage6.get("data_quality_summary", {}) if stage6 else {}
@@ -980,6 +1036,21 @@ def build_report_data(
             if critical:
                 data_lines.append(f"  严重问题：{len(critical)}个")
 
+    # 6. Fallback: auto-generate source info from variable names
+    if not data_status and stage7:
+        controls = main_result.get("controls", [])
+        sources_used = set()
+        for ctrl in controls:
+            src = CTRL_VARDEFS.get(ctrl, ("", "", ""))[2]
+            if src:
+                sources_used.add(src)
+        if sources_used:
+            data_lines.append("主要数据来源（根据变量自动推断）：")
+            for src in sorted(sources_used):
+                data_lines.append(f"  • {src}")
+        if len(data_lines) <= 4:  # Only fallback info, no real data
+            data_lines.append("提示：运行 Stage 5（数据获取）可生成完整的数据来源记录。")
+
     if not data_lines:
         data_lines.append("数据来源未记录。")
 
@@ -1014,9 +1085,9 @@ def build_report_data(
         method_name = main_result.get("method", "")
         r = _unwrap_stage7(stage7) if stage7 else {}
         actual_controls = main_result.get("controls", [])
-        n_cities = data["data_meta"].get("n_cities", 0)
-        n_treated = data["data_meta"].get("n_treated", 0)
-        n_control = data["data_meta"].get("n_control", 0)
+        n_treated = r.get("n_treated_units", data["data_meta"].get("n_treated", 0))
+        n_control = r.get("n_control_units", data["data_meta"].get("n_control", 0))
+        n_cities = n_treated + n_control or data["data_meta"].get("n_cities", 0)
         n_years = data["data_meta"].get("n_years", 0)
         n_periods = main_result.get("n_periods", n_years)
         n_cohorts = r.get("n_cohorts", 0)
@@ -1039,22 +1110,16 @@ def build_report_data(
         CTRL = "控制变量"
         variables = []
         oname = r.get("outcome", data.get("outcome", "被解释变量"))
-        variables.append((DEP, oname, f"{oname}（对数变换）" if "log" in str(oname).lower() else oname, ""))
+        olabel, odef, osrc = CTRL_VARDEFS.get(str(oname), (str(oname), str(oname), ""))
+        variables.append((DEP, olabel, odef, osrc))
         if is_cs:
             variables.append((EXP, "ATT(g,t)", "组别-时间特定平均处理效应（staggered treatment）", ""))
         else:
             variables.append((EXP, "Treated × Post", "处理组虚拟变量与处理后虚拟变量的交互项", ""))
 
-        ctrl_labels = {
-            "log_gdp_pc": "人均GDP（对数）", "log_population": "人口规模（对数）",
-            "gdp_per_capita": "人均GDP", "population_10k": "人口规模（万人）",
-            "elderly_ratio": "老龄化率（65岁以上占比）", "urbanization_rate": "城镇化率",
-            "fiscal_revenue_pc": "人均财政收入", "female_labor_participation": "女性劳动参与率",
-            "industrial_rate": "工业化率", "n_hospitals": "医院数量",
-        }
         for ctrl in actual_controls:
-            label = ctrl_labels.get(ctrl, ctrl)
-            variables.append((CTRL, label, "控制变量", ""))
+            label, definition, source = CTRL_VARDEFS.get(ctrl, (ctrl, "控制变量", ""))
+            variables.append((CTRL, label, definition, source))
 
         # ── Detailed identification narrative (generic, parameterized) ──
         ident_parts = []
@@ -1095,13 +1160,23 @@ def build_report_data(
             )
 
         # 3. Source of identification variation
-        ident_parts.append(
-            f"核心识别变异的来源为：同一时点上，处理组{entity_label}与对照组{entity_label}之间"
-            f"{outcome}变化的系统性差异。{entity_label}固定效应吸收了所有不随时间变化的"
-            f"{entity_label}层面特征，年份固定效应吸收了所有{entity_label}共同面临的"
-            f"时间趋势冲击，二者的联合控制使得\"处理组×处理后\"的交互项系数可以解释为"
-            f"{policy}对{outcome}的因果效应。"
-        )
+        if is_cs:
+            ident_parts.append(
+                f"核心识别变异的来源为：同一时点上，不同处理批次{entity_label}与从未受处理{entity_label}之间"
+                f"{outcome}变化的系统性差异。{entity_label}固定效应吸收了所有不随时间变化的"
+                f"{entity_label}层面特征，年份固定效应吸收了所有{entity_label}共同面临的"
+                f"时间趋势冲击。Callaway & Sant'Anna（2021）估计量通过先估计组别-时间特定"
+                f"ATT(g,t)，再按队列规模加权平均得到总体ATT，这一系数可以解释为"
+                f"{policy}对{outcome}的因果效应。"
+            )
+        else:
+            ident_parts.append(
+                f"核心识别变异的来源为：同一时点上，处理组{entity_label}与对照组{entity_label}之间"
+                f"{outcome}变化的系统性差异。{entity_label}固定效应吸收了所有不随时间变化的"
+                f"{entity_label}层面特征，年份固定效应吸收了所有{entity_label}共同面临的"
+                f"时间趋势冲击，二者的联合控制使得\"处理组×处理后\"的交互项系数可以解释为"
+                f"{policy}对{outcome}的因果效应。"
+            )
 
         # 4. Key identifying assumptions
         ident_parts.append(
@@ -1210,14 +1285,54 @@ def build_report_data(
                     "n_control": n_c,
                     "note": f"描述统计基于处理前（{pre_df[time_col].min()}-{pre_df[time_col].max()}年）数据。",
                 }
-                # Also update data_meta
+                # Also update data_meta — authoritative values from actual data
+                full_span = f"{int(df[time_col].min())}-{int(df[time_col].max())}"
+                src = data_source if data_source else f"面板数据（{Path(data_path).name}）"
+                data["data_meta"]["source"] = f"{src} | {full_span} | N = {len(df)} ({n_all} entities × {n_periods_val} periods)"
+                data["data_meta"]["n_obs"] = f"{len(df)}"
                 data["data_meta"]["n_cities"] = n_all
                 data["data_meta"]["n_treated"] = n_t
                 data["data_meta"]["n_control"] = n_c
                 data["data_meta"]["n_years"] = n_periods_val
-                data["data_meta"]["time_span"] = f"{int(pre_df[time_col].min())}-{int(pre_df[time_col].max())}"
+                data["data_meta"]["time_span"] = full_span
+                data["data_meta"]["n_entities"] = n_all
+                data["data_meta"]["n_periods"] = n_periods_val
         except Exception:
             pass  # descriptive stats are optional
+
+    # ── Plot paths (for images in report) ──
+    data["plots"] = data.get("plots", {})
+    if event_study_path:
+        out_dir = Path(event_study_path).parent
+        # Try multiple possible filenames for event study plot
+        for es_name in ["event_study.png", "stage7_event_study.png",
+                        str(Path(event_study_path).with_suffix(".png"))]:
+            es_candidate = out_dir / es_name
+            if es_candidate.exists():
+                data["event_study"]["plot"] = str(es_candidate)
+                break
+        # Placebo plot
+        placebo_candidate = out_dir / "placebo.png"
+        if placebo_candidate.exists():
+            data["plots"]["placebo"] = str(placebo_candidate)
+
+    # ── Completeness validation ──
+    completeness_warnings = []
+    if not data.get("descriptive_stats", {}).get("variables"):
+        completeness_warnings.append("缺少描述性统计：请使用 --data 参数提供面板数据文件")
+    if not data.get("main_result", {}).get("coefficient"):
+        completeness_warnings.append("缺少主回归结果：Stage 7 未运行或输出文件缺失")
+    if not data.get("robustness"):
+        completeness_warnings.append("缺少稳健性检验：Stage 8 未运行或输出文件未传入")
+    if not data.get("assumptions"):
+        completeness_warnings.append("缺少识别假设检验：Stage 6 未运行或输出文件未传入")
+    if not data.get("event_study", {}).get("coefficients"):
+        completeness_warnings.append("缺少事件研究（平行趋势检验）：Stage 7 事件研究未运行或输出文件未传入")
+    data["completeness_warnings"] = completeness_warnings
+    if completeness_warnings:
+        print(f"\n⚠ 报告完整性警告 ({len(completeness_warnings)}项):")
+        for w in completeness_warnings:
+            print(f"  - {w}")
 
     return data
 
@@ -1295,6 +1410,7 @@ Examples:
     parser.add_argument("--stage8", default=None, help="Stage 8 sensitivity analysis JSON")
     parser.add_argument("--stage8-placebo", default=None, help="Stage 8 placebo test JSON")
     parser.add_argument("--stage8-summary", default=None, help="Stage 8 summary JSON (from stage8_combine.py)")
+    parser.add_argument("--stage8-alt-windows", default=None, help="Stage 8 alternative time windows JSON")
     parser.add_argument("--data-source", default="", help="Data source description")
     parser.add_argument("--data-span", default="", help="Data time span")
     parser.add_argument("--n-obs", default="", help="Number of observations")
@@ -1314,12 +1430,14 @@ Examples:
     stage8 = load_json(args.stage8) if args.stage8 else None
     stage8_placebo = load_json(args.stage8_placebo) if args.stage8_placebo else None
     stage8_summary = load_json(args.stage8_summary) if args.stage8_summary else None
+    stage8_alt_windows = load_json(args.stage8_alt_windows) if args.stage8_alt_windows else None
     stage2_sections = load_json(args.stage2_sections) if args.stage2_sections else None
     data_status = load_json(args.data_status) if args.data_status else None
 
     data = build_report_data(
         args.policy, args.outcome,
         stage3, stage6, stage7, stage8, stage8_placebo, stage8_summary,
+        stage8_alt_windows,
         args.data_source, args.data_span, args.n_obs,
         stage2_sections=stage2_sections,
         data_status=data_status,

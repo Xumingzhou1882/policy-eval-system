@@ -100,7 +100,7 @@ Note: Do NOT propose method candidates at this stage. That is Stage 3.
 
 ### Structured facts output (required before Stage 3)
 
-After the narrative report, the LLM MUST produce a structured facts file at `data/auto/stage2_facts.json`. This file contains ONLY observable facts about the policy design — no methodological judgments. The facts answer 7 questions that any policy researcher can determine from public documents:
+After the narrative report, the LLM MUST produce a structured facts file. The file goes into the per-analysis output directory derived from the pipeline state file name (e.g., `--state ltci_state.json` → `data/auto/ltci_state/stage2_facts.json`). This ensures different analyses never overwrite each other. The facts file contains ONLY observable facts about the policy design — no methodological judgments. The facts answer 7 questions that any policy researcher can determine from public documents:
 
 ```json
 {
@@ -171,12 +171,15 @@ Each question is answered from observable policy facts. The `_note` and `_option
 Save this file:
 ```bash
 # The LLM writes this file after completing Stage 2 research
-# Path: data/auto/stage2_facts.json
+# Path pattern: data/auto/<state_stem>/stage2_facts.json
+# <state_stem> = the state file name without .json extension
+# Example: --state ltci_state.json → data/auto/ltci_state/stage2_facts.json
 ```
 
 Then pass it to Stage 3:
 ```bash
-python scripts/stage3_analyze.py --from-facts data/auto/stage2_facts.json
+# Example (replace <state_stem> with actual state file stem):
+python scripts/stage3_analyze.py --from-facts data/auto/<state_stem>/stage2_facts.json
 ```
 
 This replaces the previous approach where the LLM manually translated policy research into CLI flags. Now Stage 3 reads the facts and determines both the mechanism (Level 1) and the specific method (Level 2) deterministically.
@@ -198,7 +201,7 @@ Format each question with:
 
 ### Narrative sections output (required before Stage 9)
 
-After the structured facts JSON, the LLM MUST also produce `data/auto/stage2_sections.json` containing narrative prose for the final academic report. These sections are independent of method choice — they describe the policy context and economic logic, which applies regardless of which estimator is used.
+After the structured facts JSON, the LLM MUST also produce narrative prose for the final academic report, saved to the same per-analysis directory (e.g., `data/auto/<state_stem>/stage2_sections.json`). These sections are independent of method choice — they describe the policy context and economic logic, which applies regardless of which estimator is used.
 
 **CRITICAL: These sections are the primary content for the final report's 引言 and 制度背景与理论分析 chapters. Each section MUST be 400-800 Chinese characters of substantive, publication-quality prose. Short placeholder text is unacceptable.** The content written here directly determines the quality of the final academic paper. Write as if drafting a real journal submission.
 
@@ -284,7 +287,7 @@ This is the LONGEST and MOST DETAILED section. It provides the institutional kno
 
 #### Quality checklist (verify BEFORE writing the JSON file)
 
-Before saving `data/auto/stage2_sections.json`, verify:
+Before saving the sections JSON file, verify:
 
 ```
 [ ] intro_background: Opens with a concrete number/fact/event?    □
@@ -304,7 +307,8 @@ If any checkbox is unchecked, rewrite that section before saving. A section unde
 Save this file:
 ```bash
 # The LLM writes this file after completing Stage 2 research
-# Path: data/auto/stage2_sections.json
+# Path pattern: data/auto/<state_stem>/stage2_sections.json
+# Example: --state ltci_state.json → data/auto/ltci_state/stage2_sections.json
 ```
 
 The JSON schema:
@@ -334,7 +338,7 @@ This stage does NOT consider data availability. It answers: what should we do, i
 
 The decision runs in two levels, both implemented deterministically in `stage3_analyze.py`:
 
-**Level 1 — Facts → Mechanism**: Reads the Stage 2 structured facts (`data/auto/stage2_facts.json`). Classifies the assignment mechanism based on observable policy features. No methodological knowledge needed — pure rule-based classification.
+**Level 1 — Facts → Mechanism**: Reads the Stage 2 structured facts (`data/auto/<state_stem>/stage2_facts.json`). Classifies the assignment mechanism based on observable policy features. No methodological knowledge needed — pure rule-based classification.
 
 **Level 2 — Mechanism → Method**: Given a mechanism type and data structure flags, selects the specific identification strategy, enumerates assumptions, lists fallbacks, and previews required data.
 
@@ -377,12 +381,13 @@ This means:
 
 ```bash
 # Full two-level: facts → mechanism → method (preferred path)
-python scripts/stage3_analyze.py --from-facts data/auto/stage2_facts.json \
-    --output data/auto/stage3_result.json
+# Replace <state_stem> with your state file stem (e.g., ltci_state)
+python scripts/stage3_analyze.py --from-facts data/auto/<state_stem>/stage2_facts.json \
+    --output data/auto/<state_stem>/stage3_result.json
 
 # Level 2 only: mechanism already known (backward compatibility)
 python scripts/stage3_analyze.py --mechanism staggered_policy_shock \
-    --has-control-group --output data/auto/stage3_result.json
+    --has-control-group --output data/auto/<state_stem>/stage3_result.json
 ```
 
 The script outputs:
@@ -420,8 +425,8 @@ Translates Stage 3's concept-level variable requirements (e.g., "outcome", "enti
 
 ```bash
 # Auto-generate requirements by cross-referencing Stage 3 with variable_map.json
-python scripts/stage4_requirements.py --stage3 data/auto/stage3_result.json \
-    --output data/auto/stage4_requirements.json --text
+python scripts/stage4_requirements.py --stage3 data/auto/<state_stem>/stage3_result.json \
+    --output data/auto/<state_stem>/stage4_requirements.json --text
 ```
 
 The script:
@@ -507,8 +512,8 @@ When the auto-match is wrong or a variable isn't matched, the LLM writes a mappi
 
 Then re-run:
 ```bash
-python scripts/stage4_requirements.py --stage3 data/auto/stage3_result.json \
-    --mappings data/auto/stage4_mappings.json --output data/auto/stage4_requirements.json
+python scripts/stage4_requirements.py --stage3 data/auto/<state_stem>/stage3_result.json \
+    --mappings data/auto/<state_stem>/stage4_mappings.json --output data/auto/<state_stem>/stage4_requirements.json
 ```
 
 ### Confirmation step
@@ -656,7 +661,7 @@ python scripts/validate_data.py --data data/merged/panel.dta \
     --outcome log_fertility \
     --treated treated --first-treated first_treated \
     --controls gdp population \
-    --output data/auto/validation_report.json
+    --output data/auto/<state_stem>/validation_report.json
 ```
 
 This checks: panel balance, missing values, outliers, duplicate entity-time rows, variable type consistency, treatment variable logic, and pre-treatment data sufficiency. Fix critical issues before proceeding to Stage 6.
@@ -800,14 +805,14 @@ Stage 6 is automated via `scripts/stage6_confirm.py`. It is **deterministic**: s
 python scripts/run_pipeline.py --state my_analysis.json --from-stage 6 --data data/merged/panel.dta
 
 # Standalone
-python scripts/stage6_confirm.py --stage3 data/auto/stage3_result.json \
-    --data data/merged/panel.dta --output data/auto/stage6_confirmation.json
+python scripts/stage6_confirm.py --stage3 data/auto/<state_stem>/stage3_result.json \
+    --data data/merged/panel.dta --output data/auto/<state_stem>/stage6_confirmation.json
 
 # With cached validation report
-python scripts/stage6_confirm.py --stage3 data/auto/stage3_result.json \
+python scripts/stage6_confirm.py --stage3 data/auto/<state_stem>/stage3_result.json \
     --data data/merged/panel.dta \
-    --validate-report data/auto/validation_report.json \
-    --output data/auto/stage6_confirmation.json
+    --validate-report data/auto/<state_stem>/validation_report.json \
+    --output data/auto/<state_stem>/stage6_confirmation.json
 ```
 
 ### How it works
@@ -1124,23 +1129,24 @@ After completing both reference completion and field translation, save the updat
 
 ```bash
 # Step 1: Extract data
+# Replace <state_stem> with your state file stem (e.g., ltci_state)
 python scripts/output_report.py --policy "LTCI Pilot" --outcome "Fertility Rate" \
-    --stage3 data/auto/stage3_result.json \
-    --stage6 data/auto/stage6_confirmation.json \
-    --stage7 data/auto/stage7_main_result.json \
-    --stage8 data/auto/stage8_sensitivity.json \
-    --stage8-placebo data/auto/stage8_placebo.json \
-    --stage2-sections data/auto/stage2_sections.json \
+    --stage3 data/auto/<state_stem>/stage3_result.json \
+    --stage6 data/auto/<state_stem>/stage6_confirmation.json \
+    --stage7 data/auto/<state_stem>/stage7_main_result.json \
+    --stage8 data/auto/<state_stem>/stage8_sensitivity.json \
+    --stage8-placebo data/auto/<state_stem>/stage8_placebo.json \
+    --stage2-sections data/auto/<state_stem>/stage2_sections.json \
     --data data/merged/panel.dta \
-    --data-status data/auto/stage5_data_status.json \
-    --event-study data/auto/stage7_event_study.json \
-    --output data/auto/report_data.json
+    --data-status data/auto/<state_stem>/stage5_data_status.json \
+    --event-study data/auto/<state_stem>/stage7_event_study.json \
+    --output data/auto/<state_stem>/report_data.json
 
 # Step 2: LLM completes references (web search) + translates identification/abstract/conclusion → natural Chinese
 # (Read report_data.json, web-search incomplete refs, translate fields, save back)
 
 # Step 3: Render
-python scripts/render_report.py --data data/auto/report_data.json --compile
+python scripts/render_report.py --data data/auto/<state_stem>/report_data.json --compile
 ```
 
 When using the pipeline orchestrator, the LLM must perform Step 2 between

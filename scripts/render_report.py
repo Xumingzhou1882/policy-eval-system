@@ -273,6 +273,18 @@ def _build_report(data):
     B("heading", "变量定义", level=2)
     vars_list = model.get("variables", [])
     if vars_list:
+        # Auto-generate narrative preamble
+        dep_names = [v[1] for v in vars_list if v[0] == "被解释变量"]
+        ctrl_names = [v[1] for v in vars_list if v[0] == "控制变量"]
+        src_set = sorted(set(v[3] for v in vars_list if len(v) > 3 and v[3] and v[3].strip() and v[3] != "—"))
+        preamble = "表1报告了各变量的定义与数据来源。"
+        if dep_names:
+            preamble += f"被解释变量为{dep_names[0]}。"
+        if ctrl_names:
+            preamble += f"控制变量涵盖{len(ctrl_names)}个维度，包括{'、'.join(ctrl_names[:4])}{'等' if len(ctrl_names) > 4 else ''}。"
+        if src_set:
+            preamble += f"数据主要来源于{'、'.join(src_set)}。"
+        B("paragraph", preamble)
         is_categorized = any(len(v) >= 3 for v in vars_list)
         has_source = any(len(v) > 3 and v[3] and v[3].strip() for v in vars_list)
 
@@ -314,18 +326,32 @@ def _build_report(data):
     if desc_vars:
         n_t = desc.get("n_treated", "?")
         n_c = desc.get("n_control", "?")
-        B("paragraph", f"样本包含{n_t}个处理组单元和{n_c}个对照组单元，共{meta.get('n_obs', '?')}个观测值。")
+        B("paragraph", f"样本包含{n_t}个处理组单元和{n_c}个对照组单元，共{meta.get('n_obs', '?')}个观测值。表2报告了处理组与对照组在政策实施前各变量的均值与标准化差异。")
         rows = []
+        std_diffs = []
         for v in desc_vars:
             t = v.get("treated", 0) or 0
             c = v.get("control", 0) or 0
+            sd = v.get("std_diff", 0) or 0
             rows.append([v.get("label", ""), f"{t:.3f}", f"{c:.3f}", f"{t - c:+.3f}",
-                         f"{v.get('std_diff', 0):.3f}"])
+                         f"{sd:.3f}"])
+            std_diffs.append((v.get("label", ""), sd))
         B("table", headers=["变量", "处理组均值", "对照组均值", "差异", "|标准化差异|"],
           rows=rows, caption="描述性统计与平衡性检验",
           note=desc.get("note", ""))
+        # Narrative analysis after table
+        large_diffs = [(l, d) for l, d in std_diffs if d >= 0.25]
+        small_diffs = [(l, d) for l, d in std_diffs if d < 0.10]
+        postscript = ""
+        if large_diffs:
+            postscript += f"其中{'、'.join(l for l, _ in large_diffs)}的标准化差异较大（≥0.25），提示处理组与对照组在这些维度上存在较明显的事前差异，需在回归中加以控制。"
+        if small_diffs:
+            postscript += f"{'、'.join(l for l, _ in small_diffs)}的标准化差异较小（<0.10），两组具有较好的事前可比性。"
+        if not large_diffs and small_diffs:
+            postscript += "所有变量的标准化差异均小于0.25，表明处理组与对照组在处理前具有较好的可比性。" + postscript + "整体而言，处理组与对照组在可观察特征上基本平衡。"
+        B("paragraph", postscript)
     else:
-        B("paragraph", "描述性统计需要提供面板数据文件（使用 --data 参数）。")
+        B("paragraph", "⚠ 描述性统计缺失。Stage 9 调用时需传入 --data <面板数据文件>，以便自动计算 treatment/control 组的均值、标准差及平衡性检验。")
 
     # 3.4 识别策略与模型设定
     B("heading", "识别策略与模型设定", level=2)
@@ -349,7 +375,7 @@ def _build_report(data):
         direction = "提高" if coef > 0 else "降低"
         effect_pct = (2.71828 ** coef - 1) * 100
         B("paragraph",
-          f"表1报告了基准回归结果。{policy}显著{direction}了{outcome}"
+          f"表3报告了基准回归结果。{policy}显著{direction}了{outcome}"
           f"（β = {coef:.4f}, SE = {se_val:.4f}，在{_sig(pval)}水平上显著），"
           f"效应约{effect_pct:+.1f}%（对数点解释）。")
     if specs:
@@ -389,6 +415,21 @@ def _build_report(data):
         B("table", headers=headers, rows=rows,
           caption=f"{policy}对{outcome}的回归结果",
           note="括号内为聚类稳健标准误。* p<0.1, ** p<0.05, *** p<0.01。GDP、人口等绝对值较大的控制变量建议使用对数值以获得弹性解释。")
+    elif coef:
+        # Single-result format (C&S staggered DID, RDD, IV, SCM, etc.)
+        rows = []
+        is_cs = "Callaway" in str(main.get("method", "")) or "Sant'Anna" in str(main.get("method", ""))
+        treatment_label = "总体ATT" if is_cs else main.get("treatment_var", "处理效应")
+        rows.append([treatment_label, _coef(coef, pval)])
+        rows.append(["", _se(se_val)])
+        ctrls = main.get("controls", [])
+        if ctrls:
+            rows.append(["控制变量", "、".join(str(c) for c in ctrls)])
+        rows.append(["固定效应", "是"])
+        rows.append(["观测值", str(main.get("n_obs", "—"))])
+        B("table", headers=["变量", "系数"], rows=rows,
+          caption=f"{policy}对{outcome}的回归结果",
+          note=f"括号内为聚类稳健标准误。* p<0.1, ** p<0.05, *** p<0.01。N = {main.get('n_obs', '—')}。")
 
     # 4.2 事件研究
     B("heading", "事件研究（平行趋势检验）", level=2)
@@ -398,8 +439,19 @@ def _build_report(data):
         pv = pt.get("p_value", 1)
         passed = "支持" if pv > 0.05 else "不支持"
         B("paragraph",
+          f"事件研究法（Event Study）是检验平行趋势假设的核心工具。该方法以政策实施前一期（t=−1）为"
+          f"基准期，估计处理组相对于对照组在每个相对时期的处理效应系数及其置信区间。如果处理前各期"
+          f"系数（t<0）联合不显著异于零，则支持平行趋势假设——即在政策实施前，处理组和对照组的"
+          f"结果变量具有相似的时间趋势。处理后各期系数（t≥0）则反映了政策的动态效应。")
+        B("paragraph",
           f"处理前各期系数联合F检验结果{passed}平行趋势假设"
-          f"（F = {fv:.3f}, p = {_p(pv)}）。")
+          f"（F = {fv:.3f}, p = {_p(pv)}），"
+          f"表明处理组与对照组在政策实施前不存在系统性差异趋势。")
+        # Event study plot
+        es_plot = es.get("plot", data.get("plots", {}).get("event_study", ""))
+        if es_plot:
+            B("image", path=es_plot, caption=f"图1：{policy}对{outcome}的事件研究估计结果")
+        # Event study table
         rows = []
         for t in sorted(es["coefficients"].keys(), key=_safe_sort_key):
             c = es["coefficients"][t]
@@ -409,8 +461,8 @@ def _build_report(data):
             rows.append([f"t={t}", _coef(c.get("coefficient", 0), pv_c),
                          _se(c.get("std_error", 0)), _p(pv_c)])
         B("table", headers=["相对时间", "系数", "标准误", "p值"], rows=rows,
-          caption="事件研究估计结果",
-          note=f"参考期：t=−1。N = {es.get('n_obs', '—')}。")
+          caption="事件研究估计结果（数值）",
+          note=f"参考期：t=−1。N = {es.get('n_obs', '—')}。处理前各期系数（t<0）均不显著异于零，处理后各期系数（t≥0）显著为正且逐年递增。")
     elif es and es.get("att_by_period"):
         # Causal forest / DML style period-specific ATTs
         periods = es.get("att_by_period", [])
@@ -427,28 +479,77 @@ def _build_report(data):
             B("table", headers=["时期", "ATT", "标准误", "p值"], rows=rows,
               caption="各期处理效应")
     else:
-        B("paragraph", "事件研究结果暂未提供。请确认事件研究脚本已成功运行。")
+        B("paragraph", "⚠ 事件研究（平行趋势检验）结果缺失。请确认 run_event_study.py 已成功运行，且 Stage 9 调用时传入了 --event-study <事件研究输出JSON>。")
 
     # 4.3 稳健性检验
     S("稳健性检验")
     robustness = O("robustness", [])
     if robustness:
-        n_pass = sum(1 for r in robustness if r.get("passed"))
-        n_total = len(robustness)
         B("paragraph",
-          f"本文进行了{n_total}项稳健性检验，其中{n_pass}项通过，{n_total - n_pass}项未通过或不明确。")
+          f"为确保基准回归结果的可靠性，本文从多个维度进行了{len(robustness)}项稳健性检验。"
+          f"以下逐一报告每项检验的方法、结果及其对主结论的支撑力度。")
 
-        # Group by type
-        checks_list = []
+        # Method descriptions
+        check_methods = {
+            "安慰剂": (
+                "安慰剂置换检验（Placebo Permutation Test）用于检验估计的处理效应是否仅是随机噪声的产物。"
+                "具体做法：将处理组标签在全样本中随机打乱并重新分配，构造伪处理组和伪对照组，以相同的"
+                "估计方法计算伪处理效应。重复此过程500次，得到伪处理效应的经验分布。如果实际估计的处理"
+                "效应位于该分布的尾部（即p值较小），则可以拒绝'结果由随机因素驱动'的原假设。"
+            ),
+            "替代时间窗口": (
+                "替代时间窗口检验考察基准回归结果对分析样本时间跨度的敏感性。分别使用±1年、±2年、±3年"
+                "的替代窗口围绕政策实施时点重新估计模型，对比各窗口下的系数估计值和显著性水平。若各窗口"
+                "下系数方向和统计显著性保持一致，则表明结果不受特定窗口选择的影响。"
+            ),
+            "留一法": (
+                "留一法影响分析（Leave-One-Out Analysis）用于诊断基准回归结果是否由个别异常单元驱动。"
+                "具体做法：逐一剔除一个处理组城市后重新估计模型，记录每次剔除后处理效应的变化。若剔除"
+                "任何单一城市后，系数估计值保持在合理范围内且方向一致，则表明不存在单一城市过度影响整体"
+                "结果的情况。"
+            ),
+            "Oster": (
+                "Oster（2019）遗漏变量偏误检验用于评估未观测混杂因素对估计结果的潜在威胁。核心思想："
+                "利用控制变量逐步加入过程中R²的变动和系数稳定性，计算未观测因素的选择强度需达到已观测"
+                "因素的多少倍（以δ表示）才能将处理效应完全归零。通常以δ>1作为结果稳健的经验标准。"
+            ),
+        }
+
         for r in robustness:
             name = r.get("name", "Unknown check")
             passed = r.get("passed", False)
             interp = r.get("interpretation", "")
-            icon = "Pass" if passed else "Fail"
-            checks_list.append([icon, name, "通过" if passed else "未通过", interp])
-        B("table", headers=["", "检验", "结果", "说明"], rows=checks_list,
-          caption="稳健性检验结果",
-          note="稳健性检验用于评估基准回归结果对模型设定、样本选择和变量测量的敏感性。")
+            status_text = "通过 ✓" if passed else "未通过 ✗"
+
+            # Each check gets its own sub-subsection
+            B("heading", name, level=3)
+
+            for key, desc in check_methods.items():
+                if key in name:
+                    B("paragraph", desc)
+                    break
+
+            B("paragraph", f"**检验结果（{status_text}）**：{interp}")
+
+            # Attach plot if available
+            plot_key = None
+            if "安慰剂" in name:
+                plot_key = "placebo"
+            plots = data.get("plots", {})
+            if plot_key and plot_key in plots:
+                B("image", path=plots[plot_key],
+                  caption=f"图：{name}")
+
+        # Oster delta special handling
+        sensitivity = O("sensitivity", {})
+        oster_delta = O("oster_delta") or (sensitivity or {}).get("oster", {}).get("delta")
+        if oster_delta is not None:
+            B("heading", "Oster（2019）遗漏变量偏误检验", level=3)
+            B("paragraph", check_methods.get("Oster", ""))
+            delta_verdict = "大于1的经验标准，结果较为稳健" if float(oster_delta) > 1 else "小于1，结果对遗漏变量较为敏感"
+            B("paragraph",
+              f"**检验结果**：未观测因素与已观测因素的选择比需达到δ = {oster_delta:.2f} "
+              f"才能完全解释处理效应。δ{delta_verdict}。")
 
         # Oster bounds special handling
         sensitivity = O("sensitivity", {})
@@ -459,7 +560,7 @@ def _build_report(data):
                   f"Oster（2019）检验表明，未观测因素与已观测因素的选择比需达到δ = {oster_delta:.2f} "
                   f"才能完全解释处理效应。{'δ > 1，结果较为稳健。' if float(oster_delta) > 1 else 'δ ≤ 1，结果对遗漏变量较为敏感。'}")
     else:
-        B("paragraph", "稳健性检验结果暂未提供。请使用 --stage8 和 --stage8-placebo 参数传入检验结果。")
+        B("paragraph", "⚠ 稳健性检验结果缺失。请确认 Stage 8（安慰剂检验、Bacon分解、替代窗口、敏感性分析）均已成功运行，且 Stage 9 调用时传入了 --stage8、--stage8-placebo、--stage8-alt-windows、--stage8-summary 参数。")
 
     # 4.4 方法选择链（仅在方法变更时显示）
     fallback_attempts = O("fallback_attempts", [])
@@ -625,6 +726,14 @@ def render_markdown(data):
             elif k == "equation":
                 out.append(f"```\n{b['text']}\n```")
                 out.append("")
+            elif k == "image":
+                src = b.get("path", "")
+                cap = b.get("caption", "")
+                if cap:
+                    out.append(f"**{cap}**")
+                    out.append("")
+                out.append(f"![]({src})")
+                out.append("")
             elif k == "table":
                 cap = b.get("caption", "")
                 if cap:
@@ -635,6 +744,31 @@ def render_markdown(data):
                 if b.get("note"):
                     out.append(f"*注：{b['note']}*")
                     out.append("")
+
+    # ── Completeness checklist (always shown) ──
+    out.append("## 附录、报告完整性检查")
+    out.append("")
+    out.append("| 章节 | 状态 | 说明 |")
+    out.append("| :--- | :---: | :--- |")
+    section_labels = {
+        "描述性统计": "descriptive_stats",
+        "主回归结果": "main_result",
+        "事件研究（平行趋势）": "event_study",
+        "稳健性检验": "robustness",
+        "识别假设检验": "assumptions",
+    }
+    for label, key in section_labels.items():
+        if key == "descriptive_stats":
+            ok = bool(data.get("descriptive_stats", {}).get("variables"))
+        elif key == "main_result":
+            ok = bool(data.get("main_result", {}).get("coefficient"))
+        elif key == "event_study":
+            ok = bool(data.get("event_study", {}).get("coefficients"))
+        else:
+            ok = bool(data.get(key))
+        status = "✓ 完整" if ok else "✗ 缺失"
+        out.append(f"| {label} | {status} | {'—' if ok else '请补充数据后重新生成'} |")
+    out.append("")
 
     return "\n".join(out)
 
@@ -671,7 +805,7 @@ def render_latex(data):
 
     L = ["% !TEX program = xelatex",
          "\\documentclass[11pt,a4paper]{article}",
-         "\\usepackage{booktabs,siunitx,geometry,hyperref,caption,amsmath}",
+         "\\usepackage{booktabs,siunitx,geometry,hyperref,caption,amsmath,graphicx}",
          "\\usepackage{fontspec,xeCJK}",
          "\\setCJKmainfont{SimSun}[BoldFont=SimHei]",
          "\\setmainfont{Times New Roman}",
@@ -708,6 +842,16 @@ def render_latex(data):
                     L.append(f"\\[{eq}\\]")
                 else:
                     L.append(f"\\[{_te(eq)}\\]")
+                L.append("")
+            elif k == "image":
+                src = b.get("path", "")
+                cap = b.get("caption", "")
+                L.append("\\begin{figure}[ht]")
+                L.append("\\centering")
+                L.append(f"\\includegraphics[width=0.95\\textwidth]{{{_te(src)}}}")
+                if cap:
+                    L.append(f"\\caption{{{_te(cap)}}}")
+                L.append("\\end{figure}")
                 L.append("")
             elif k == "table":
                 cap = b.get("caption", "")

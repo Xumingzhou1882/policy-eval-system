@@ -127,8 +127,8 @@ def _check_sensitivity(sensitivity: dict) -> list[dict]:
     # Leave-one-out
     loo = sensitivity.get("leave_one_out", {})
     if loo:
-        loo_min = loo.get("min_coef", 0)
-        loo_max = loo.get("max_coef", 0)
+        loo_min = loo.get("min_coefficient", loo.get("min_coef", 0))
+        loo_max = loo.get("max_coefficient", loo.get("max_coef", 0))
         loo_baseline = loo.get("baseline_coef", 0)
         loo_range = abs(loo_max - loo_min)
         loo_passed = loo_range < abs(loo_baseline) if loo_baseline != 0 else True

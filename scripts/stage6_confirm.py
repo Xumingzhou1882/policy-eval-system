@@ -34,6 +34,7 @@ import pandas as pd
 SCRIPTS_DIR = Path(__file__).resolve().parent
 DATA_DIR = SCRIPTS_DIR.parent / "data"
 AUTO_DIR = DATA_DIR / "auto"
+MERGED_DIR = DATA_DIR / "merged"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -127,15 +128,16 @@ def _run_py(script_name: str, args: list[str]) -> subprocess.CompletedProcess:
 
 def _load_validation_report(data_path: str, output_col: str,
                             entity_col: str, time_col: str,
-                            validate_report_path: str = None) -> dict:
+                            validate_report_path: str = None,
+                            output_dir: str = None) -> dict:
     """Run validate_data.py or load a cached report."""
     if validate_report_path and Path(validate_report_path).exists():
         with open(validate_report_path, encoding="utf-8") as f:
             report = json.load(f)
     else:
         resolved = _resolve_data(data_path)
-        tmp_out = str(AUTO_DIR / "_stage6_validation.json")
-        AUTO_DIR.mkdir(parents=True, exist_ok=True)
+        out_d = Path(output_dir) if output_dir else AUTO_DIR
+        tmp_out = str(out_d / "_stage6_validation.json")
         proc = _run_py("validate_data.py", [
             "--data", resolved, "--outcome", output_col,
             "--entity", entity_col, "--time", time_col,
@@ -1374,6 +1376,7 @@ def confirm_method(
     data_status: dict = None,
     entity_col: str = "city_id",
     time_col: str = "year",
+    output_dir: str = None,
 ) -> MethodConfirmation:
     """Confirm the theoretical method against actual data."""
 
@@ -1435,6 +1438,7 @@ def confirm_method(
     data_quality = _load_validation_report(
         data_path, outcome_col_actual, entity_col, time_col,
         validate_report.get("path") if validate_report else None,
+        output_dir,
     )
 
     # ── Step 2: Verify each assumption ──
@@ -1485,7 +1489,7 @@ def confirm_method(
             continue
 
         diag = _diagnose_assumption(
-            a, mechanism, data_path, df, str(AUTO_DIR),
+            a, mechanism, data_path, df, output_dir or str(AUTO_DIR),
             entity_col, time_col, outcome_col_actual,
         )
 
@@ -1525,7 +1529,7 @@ def confirm_method(
         selected, attempts = _resolve_fallback_chain(
             [v for v in verdicts if v.verdict == "FAIL"],
             fallbacks, data_path, df, stage3_output,
-            str(AUTO_DIR), entity_col, time_col, outcome_col_actual,
+            output_dir or str(AUTO_DIR), entity_col, time_col, outcome_col_actual,
             first_treated_col, treated_col,
         )
         fallback_attempts = attempts
@@ -1631,6 +1635,7 @@ def _build_specification(final_method: str, inputs: dict, rec: dict,
         spec.update({
             "treated_col": treated_col,
             "post_col": inputs.get("post_col", "post"),
+            "method": "twfe",
             "no_estimation_script": False,
         })
     elif "rdd" in ml:
@@ -1638,43 +1643,57 @@ def _build_specification(final_method: str, inputs: dict, rec: dict,
             "running_var": inputs.get("running_var", "running_var"),
             "cutoff": inputs.get("cutoff", 0),
             "rdd_type": inputs.get("threshold_type", "sharp"),
+            "method": "rdd",
             "no_estimation_script": False,
         })
     elif any(k in ml for k in ("iv", "2sls", "liml")):
         spec.update({
             "treatment_var": inputs.get("treatment_var", "treatment"),
             "instruments": inputs.get("instruments", []),
+            "method": "iv",
             "no_estimation_script": False,
         })
     elif "synthetic did" in ml or "synthetic difference" in ml:
         spec.update({
             "treated_unit": inputs.get("treated_unit", ""),
             "first_treated": inputs.get("first_treated", 0),
+            "method": "sdid",
             "no_estimation_script": False,
         })
     elif "scm" in ml or "synthetic control" in ml:
         spec.update({
             "treated_unit": inputs.get("treated_unit", ""),
             "first_treated": inputs.get("first_treated", 0),
+            "method": "scm",
             "no_estimation_script": False,
         })
     elif any(k in ml for k in ("dml", "psm", "ipw", "aipw", "causal forest", "cem")):
         spec.update({
             "treatment_var": inputs.get("treatment_var", "treatment"),
+            "method": "dml" if "dml" in ml else ("causal_forest" if "causal forest" in ml else "psm"),
             "no_estimation_script": "dml" not in ml and "causal forest" not in ml,
         })
     elif "ddd" in ml or "triple difference" in ml:
         spec.update({
             "treatment_a": inputs.get("policy_a_col", "treatment_a"),
             "treatment_b": inputs.get("policy_b_col", "treatment_b"),
+            "method": "ddd",
             "no_estimation_script": True,
         })
     elif "intensity" in ml:
         spec.update({
             "intensity_col": inputs.get("intensity_col", "treatment_intensity"),
+            "method": "intensity_did",
+            "no_estimation_script": True,
+        })
+    elif "random" in ml:
+        spec.update({
+            "treatment_var": inputs.get("treatment_var", "treatment"),
+            "method": "randomization",
             "no_estimation_script": True,
         })
     else:
+        spec["method"] = "unknown"
         spec["no_estimation_script"] = True
         spec["note"] = f"No estimation script registered for: {final_method}"
 
@@ -1795,6 +1814,7 @@ Examples:
     print(f"Data: {args.data}")
     print()
 
+    output_dir = str(Path(args.output).parent)
     confirmation = confirm_method(
         stage3_output=stage3_output,
         data_path=args.data,
@@ -1802,6 +1822,7 @@ Examples:
         data_status=data_status,
         entity_col=args.entity,
         time_col=args.time,
+        output_dir=output_dir,
     )
 
     # Print summary
